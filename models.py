@@ -1,0 +1,64 @@
+from datetime import datetime
+from extensions import db
+
+
+class Student(db.Model):
+    __tablename__ = "students"
+
+    id = db.Column(db.Integer, primary_key=True)
+    full_name = db.Column(db.String(150), nullable=False)
+    registration = db.Column(db.String(50), nullable=False, unique=True)
+    school_year = db.Column(db.String(50), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    results = db.relationship("Result", backref="student", lazy=True, cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<Student {self.full_name} – {self.school_year}>"
+
+
+class Event(db.Model):
+    __tablename__ = "events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    num_corridas = db.Column(db.Integer, nullable=False, default=1)  # number of heats per student
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    results = db.relationship("Result", backref="event", lazy=True, cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<Event {self.name} ({self.num_corridas} corrida(s))>"
+
+
+class Result(db.Model):
+    __tablename__ = "results"
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("students.id"), nullable=False)
+    event_id = db.Column(db.Integer, db.ForeignKey("events.id"), nullable=False)
+    corrida_num = db.Column(db.Integer, nullable=False, default=1)  # which heat (1, 2, 3…)
+
+    minutes = db.Column(db.Integer, nullable=False, default=0)
+    seconds = db.Column(db.Integer, nullable=False, default=0)
+    centesimos = db.Column(db.Integer, nullable=False, default=0)
+    total_time = db.Column(db.Float, nullable=True)  # computed: min*60 + sec + cent/100
+
+    placement = db.Column(db.Integer, nullable=True)
+    points = db.Column(db.Integer, nullable=False, default=0)
+    is_dq = db.Column(db.Boolean, default=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Unique per student × event × heat
+    __table_args__ = (
+        db.UniqueConstraint("student_id", "event_id", "corrida_num", name="uix_student_event_corrida"),
+    )
+
+    def time_display(self):
+        if self.is_dq:
+            return "DQ"
+        return f"{self.minutes}:{self.seconds:02d}.{self.centesimos:02d}"
+
+    def __repr__(self):
+        return f"<Result s={self.student_id} e={self.event_id} c={self.corrida_num} t={self.total_time}>"

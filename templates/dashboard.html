@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}Ranking geral das equipes e resultados por prova{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('upload.upload') }}" class="btn btn-primary">
+    ⬆️ Upload de Resultados
+</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Stat Cards ──────────────────────────────────────────────────── -->
+<div class="grid-3" style="margin-bottom: 32px;">
+    <div class="stat-card">
+        <span class="stat-icon">🏊‍♂️</span>
+        <div class="stat-info">
+            <div class="stat-value">{{ team_ranking | length }}</div>
+            <div class="stat-label">Equipes</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <span class="stat-icon">🏅</span>
+        <div class="stat-info">
+            <div class="stat-value">{{ event_results | length }}</div>
+            <div class="stat-label">Provas Realizadas</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <span class="stat-icon">⭐</span>
+        <div class="stat-info">
+            <div class="stat-value">
+                {% if team_ranking %}
+                {{ team_ranking[0].total_points }}
+                {% else %}—{% endif %}
+            </div>
+            <div class="stat-label">Pontos do Líder</div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Team Ranking ───────────────────────────────────────────────── -->
+<div class="section-title">🏆 Ranking de Equipes</div>
+
+{% if not has_results %}
+<div class="empty-state">
+    <span class="empty-state-icon">📭</span>
+    <h3>Nenhum resultado ainda</h3>
+    <p>Faça o upload de uma planilha de resultados para visualizar o ranking das equipes.</p>
+    <br />
+    <a href="{{ url_for('upload.upload') }}" class="btn btn-primary">Fazer Upload</a>
+</div>
+{% else %}
+<div class="ranking-list" style="margin-bottom: 40px;">
+    {% for item in team_ranking %}
+    {% set rank = loop.index %}
+    <div class="ranking-item {% if rank == 1 %}rank-1{% elif rank == 2 %}rank-2{% elif rank == 3 %}rank-3{% endif %}">
+        <div class="rank-badge {% if rank == 1 %}gold{% elif rank == 2 %}silver{% elif rank == 3 %}bronze{% endif %}">
+            {% if rank == 1 %}🥇{% elif rank == 2 %}🥈{% elif rank == 3 %}🥉{% else %}{{ rank }}{% endif %}
+        </div>
+        <div class="rank-team">{{ item.school_year }}</div>
+        <div style="text-align: right;">
+            <div class="rank-points">{{ item.total_points }}</div>
+            <div class="rank-pts-label">pontos</div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- ── Results by Event ──────────────────────────────────────────── -->
+<div class="section-title">📋 Resultados por Prova</div>
+
+<div class="event-accordion">
+    {% for event, by_corrida in event_results.items() %}
+    <div class="event-panel" id="panel-{{ event.id }}">
+        <div class="event-panel-header" onclick="togglePanel('panel-{{ event.id }}')">
+            <div class="event-panel-title">
+                🏁 {{ event.name }}
+                <span class="count-pill">
+                    {% set total = namespace(n=0) %}
+                    {% for cnum, by_year in by_corrida.items() %}
+                    {% for yr, results in by_year.items() %}{% set total.n = total.n + results|length %}{% endfor %}
+                    {% endfor %}
+                    {{ total.n }}
+                </span>
+            </div>
+            <span class="event-panel-chevron">▼</span>
+        </div>
+        <div class="event-panel-body">
+            {% for corrida_num, by_year in by_corrida.items() %}
+            {% if event.num_corridas > 1 %}
+            <div style="font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase;
+                            letter-spacing: 0.1em; margin: 16px 0 8px; padding: 4px 0;
+                            border-bottom: 1px solid var(--border-accent);">
+                🏊 Corrida {{ corrida_num }}
+            </div>
+            {% endif %}
+            {% for school_year, results in by_year.items() %}
+            <div class="year-group">
+                <div class="year-group-title">🎓 {{ school_year }}</div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Pos.</th>
+                                <th>Aluno</th>
+                                <th>Matrícula</th>
+                                <th>Tempo</th>
+                                <th>Pontos</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in results %}
+                            <tr>
+                                <td>
+                                    {% if r.is_dq %}
+                                    <span class="badge badge-danger">DQ</span>
+                                    {% elif r.placement == 1 %}
+                                    <span class="placement-medal">🥇</span>
+                                    {% elif r.placement == 2 %}
+                                    <span class="placement-medal">🥈</span>
+                                    {% elif r.placement == 3 %}
+                                    <span class="placement-medal">🥉</span>
+                                    {% elif r.placement %}
+                                    <span class="badge badge-muted">{{ r.placement }}º</span>
+                                    {% else %}—{% endif %}
+                                </td>
+                                <td><strong>{{ r.student.full_name }}</strong></td>
+                                <td style="color: var(--text-muted);">{{ r.student.registration }}</td>
+                                <td>
+                                    {% if r.is_dq %}
+                                    <span style="color: var(--danger);">Desclassificado</span>
+                                    {% else %}
+                                    <span style="font-family: monospace; font-size: 13px;">{{ r.time_display() }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge
+                                          {% if r.points == 10 %}badge-gold
+                                          {% elif r.points >= 7 %}badge-silver
+                                          {% elif r.points > 0 %}badge-accent
+                                          {% else %}badge-muted{% endif %}">
+                                        {{ r.points }} pts
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Balizamento Automático{% endblock %} — SwimRank</title>
+  <meta name="description" content="Sistema de gerenciamento e ranqueamento de competições de natação escolar." />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏊</text></svg>" />
+</head>
+<body>
+
+  <!-- Sidebar overlay (mobile) -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- ══ SIDEBAR ══════════════════════════════ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-icon">🏊‍♂️</span>
+      <h1>SwimRank</h1>
+      <span>Balizamento Automático</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="nav-label">Navegação</span>
+
+      <a href="{{ url_for('dashboard.index') }}"
+         class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}">
+        <span class="nav-icon">📊</span> Dashboard
+      </a>
+
+      <a href="{{ url_for('cadastros.cadastros') }}"
+         class="nav-link {% if request.endpoint and 'cadastros' in request.endpoint %}active{% endif %}">
+        <span class="nav-icon">📝</span> Cadastros
+      </a>
+
+      <a href="{{ url_for('balizamento.balizamento') }}"
+         class="nav-link {% if request.endpoint and 'balizamento' in request.endpoint %}active{% endif %}">
+        <span class="nav-icon">📤</span> Balizamento
+      </a>
+
+      <a href="{{ url_for('upload.upload') }}"
+         class="nav-link {% if request.endpoint == 'upload.upload' or request.endpoint == 'upload.process' %}active{% endif %}">
+        <span class="nav-icon">⬆️</span> Upload de Resultados
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      SwimRank © 2025
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ═════════════════════════════════ -->
+  <div class="main">
+    <header class="topbar">
+      <button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+      <div>
+        <div class="topbar-title">{% block page_title %}Dashboard{% endblock %}</div>
+        <div class="topbar-subtitle">{% block page_subtitle %}{% endblock %}</div>
+      </div>
+      <div>{% block topbar_actions %}{% endblock %}</div>
+    </header>
+
+    <div class="content">
+      <!-- Flash messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-container">
+            {% for category, message in messages %}
+              <div class="flash flash-{{ category }}">
+                <span>
+                  {% if category == 'success' %}✅{% elif category == 'error' %}❌{% else %}⚠️{% endif %}
+                </span>
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Cadastros{% endblock %}
+{% block page_title %}Cadastros{% endblock %}
+{% block page_subtitle %}Gerencie alunos e provas do evento{% endblock %}
+
+{% block content %}
+
+<!-- ── Tabs ──────────────────────────────────────────────────────── -->
+<div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('alunos', this)" id="tab-alunos">
+        🤽 Alunos <span class="count-pill">{{ students | length }}</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('provas', this)" id="tab-provas">
+        🏁 Provas <span class="count-pill">{{ events | length }}</span>
+    </button>
+</div>
+
+<!-- ══════════════════════════════════════════
+     TAB: ALUNOS
+══════════════════════════════════════════ -->
+<div class="tab-pane active" id="pane-alunos">
+    <div class="grid-2">
+
+        <!-- Add Student Form -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">➕ Cadastrar Aluno</div>
+            </div>
+            <form method="POST" action="{{ url_for('cadastros.add_student') }}">
+                <div class="form-group">
+                    <label for="full_name">Nome Completo</label>
+                    <input type="text" id="full_name" name="full_name" placeholder="ex: João Silva" required />
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="registration">Matrícula</label>
+                        <input type="text" id="registration" name="registration" placeholder="ex: 2025001" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="school_year">Ano Escolar / Equipe</label>
+                        <select id="school_year" name="school_year" required>
+                            <option value="" disabled selected>Selecione...</option>
+                            <option>6º Ano</option>
+                            <option>7º Ano</option>
+                            <option>8º Ano</option>
+                            <option>9º Ano</option>
+                            <option>1º Ano Médio</option>
+                            <option>2º Ano Médio</option>
+                            <option>3º Ano Médio</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">
+                    Cadastrar Aluno
+                </button>
+            </form>
+        </div>
+
+        <!-- Student List -->
+        <div class="card" style="padding: 0; overflow: hidden;">
+            <div class="card-header" style="padding: 18px 20px;">
+                <div class="card-title">📋 Alunos Cadastrados</div>
+                <span class="count-pill">{{ students | length }}</span>
+            </div>
+            {% if students %}
+            <div class="table-wrapper" style="border: none; border-radius: 0;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Matrícula</th>
+                            <th>Equipe</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in students %}
+                        <tr id="student-row-{{ s.id }}">
+                            <td>{{ s.full_name }}</td>
+                            <td style="color: var(--text-muted);">{{ s.registration }}</td>
+                            <td><span class="badge badge-accent">{{ s.school_year }}</span></td>
+                            <td>
+                                <button class="btn btn-danger btn-sm btn-icon" title="Remover aluno" onclick="deleteRecord('{{ url_for('cadastros.delete_student', student_id=s.id) }}',
+                                                'student-row-{{ s.id }}',
+                                                '{{ s.full_name }}')">
+                                    🗑️
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding: 40px;">
+                <span class="empty-state-icon">🤽</span>
+                <h3>Nenhum aluno</h3>
+                <p>Cadastre o primeiro aluno usando o formulário ao lado.</p>
+            </div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     TAB: PROVAS
+══════════════════════════════════════════ -->
+<div class="tab-pane" id="pane-provas">
+    <div class="grid-2">
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">➕ Cadastrar Prova</div>
+            </div>
+            <form method="POST" action="{{ url_for('cadastros.add_event') }}">
+                <div class="form-group">
+                    <label for="event_name">Nome da Prova</label>
+                    <input type="text" id="event_name" name="name" placeholder="ex: 50m Livre, 4x25m Misto" required />
+                </div>
+                <div class="form-group">
+                    <label for="num_corridas">Número de Corridas por Aluno</label>
+                    <input type="number" id="num_corridas" name="num_corridas" min="1" max="10" value="1" required />
+                    <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
+                        💡 Deixe <strong style="color: var(--text-secondary);">1</strong> se cada aluno nada apenas uma
+                        vez.
+                        Aumente para provas em que o aluno tem eliminatória + final, etc.
+                    </p>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">
+                    Cadastrar Prova
+                </button>
+            </form>
+        </div>
+
+        <!-- Event List -->
+        <div class="card" style="padding: 0; overflow: hidden;">
+            <div class="card-header" style="padding: 18px 20px;">
+                <div class="card-title">🏁 Provas Cadastradas</div>
+                <span class="count-pill">{{ events | length }}</span>
+            </div>
+            {% if events %}
+            <div class="table-wrapper" style="border: none; border-radius: 0;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Nome da Prova</th>
+                            <th>Corridas</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for e in events %}
+                        <tr id="event-row-{{ e.id }}">
+                            <td style="color: var(--text-muted);">{{ loop.index }}</td>
+                            <td><strong>{{ e.name }}</strong></td>
+                            <td><span class="badge badge-accent">{{ e.num_corridas }}x</span></td>
+                            <td>
+                                <button class="btn btn-danger btn-sm btn-icon" title="Remover prova" onclick="deleteRecord('{{ url_for('cadastros.delete_event', event_id=e.id) }}',
+                                                'event-row-{{ e.id }}',
+                                                '{{ e.name }}')">
+                                    🗑️
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding: 40px;">
+                <span class="empty-state-icon">🏁</span>
+                <h3>Nenhuma prova</h3>
+                <p>Cadastre as provas do evento usando o formulário ao lado.</p>
+            </div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

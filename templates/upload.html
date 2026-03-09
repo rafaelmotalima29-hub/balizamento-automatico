@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Upload de Resultados{% endblock %}
+{% block page_title %}Upload de Resultados{% endblock %}
+{% block page_subtitle %}Envie a planilha preenchida para processar o ranking{% endblock %}
+
+{% block content %}
+
+<div style="max-width: 700px; margin: 0 auto;">
+
+    <!-- Drop Zone -->
+    <form method="POST" action="{{ url_for('upload.process') }}" enctype="multipart/form-data" id="upload-form">
+
+        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+            <span class="drop-icon" id="drop-icon">☁️</span>
+            <div class="drop-title" id="drop-title">Arraste seu arquivo aqui</div>
+            <div class="drop-sub">ou clique para selecionar — CSV, XLS ou XLSX</div>
+            <div id="file-preview" style="display:none;" class="drop-file-selected">
+                <span>📄</span>
+                <span id="file-name"></span>
+            </div>
+            <input type="file" id="file-input" name="file" accept=".csv,.xlsx,.xls" required />
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg" id="upload-btn"
+            style="width: 100%; margin-top: 16px; display: none;">
+            ⚡ Processar Resultados
+        </button>
+    </form>
+
+    <!-- Info Cards -->
+    <div class="grid-2" style="margin-top: 32px; gap: 16px;">
+        <div class="card">
+            <div class="card-title" style="margin-bottom: 12px; font-size: 14px;">📋 Colunas esperadas</div>
+            <ul style="list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
+                {% for col in ["Nome", "Matrícula", "Ano Escolar", "Prova", "Minutos", "Segundos", "Centésimos"] %}
+                <li style="display: flex; align-items: center; gap: 8px;">
+                    <span style="color: var(--accent);">✓</span>
+                    <code style="background: var(--bg-input); padding: 2px 8px; border-radius: 4px;">{{ col }}</code>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="card">
+            <div class="card-title" style="margin-bottom: 12px; font-size: 14px;">⚡ Regras de Processamento</div>
+            <ul
+                style="list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--text-secondary);">
+                <li>📐 Tempo convertido para segundos totais</li>
+                <li>🏆 Ranking separado por prova + ano</li>
+                <li>🔁 Empates recebem mesma pontuação</li>
+                <li>
+                    ❌ DQ:
+                    <code style="background: var(--bg-input); padding: 2px 6px; border-radius: 4px;">9</code> /
+                    <code style="background: var(--bg-input); padding: 2px 6px; border-radius: 4px;">99</code> /
+                    <code style="background: var(--bg-input); padding: 2px 6px; border-radius: 4px;">99</code>
+                    = 0 pts
+                </li>
+                <li>🔄 Upload substitui resultados anteriores</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Points table reference -->
+    <div class="card" style="margin-top: 16px;">
+        <div class="card-title" style="margin-bottom: 16px; font-size: 14px;">🎯 Tabela de Pontos</div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            {% set pts = [(1,"🥇",10,"badge-gold"), (2,"🥈",8,"badge-silver"), (3,"🥉",7,"badge-bronze"),
+            (4,"4º",6,"badge-accent"), (5,"5º",5,"badge-accent"), (6,"6º",4,"badge-accent"),
+            (7,"7º",3,"badge-muted"), (8,"8º",2,"badge-muted"), (9,"9º",1,"badge-muted")] %}
+            {% for pos, icon, p, cls in pts %}
+            <div
+                style="text-align: center; padding: 10px 14px; background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border); min-width: 64px;">
+                <div style="font-size: 18px;">{{ icon }}</div>
+                <div class="badge {{ cls }}" style="margin-top: 4px;">{{ p }} pts</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Hint to download template -->
+    <div style="text-align: center; margin-top: 24px; color: var(--text-muted); font-size: 13px;">
+        Não tem a planilha?
+        <a href="{{ url_for('balizamento.export_csv') }}" style="color: var(--accent);">
+            Baixe o template de balizamento →
+        </a>
+    </div>
+</div>
+
+{% endblock %}
