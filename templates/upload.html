@@ -33,7 +33,8 @@
         <div class="card">
             <div class="card-title" style="margin-bottom: 12px; font-size: 14px;">📋 Colunas esperadas</div>
             <ul style="list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
-                {% for col in ["Nome", "Matrícula", "Ano Escolar", "Prova", "Minutos", "Segundos", "Centésimos"] %}
+                {% for col in ["Série", "Raia", "Nome", "Matrícula", "Ano Escolar", "Sala", "Minutos", "Segundos",
+                "Centésimos"] %}
                 <li style="display: flex; align-items: center; gap: 8px;">
                     <span style="color: var(--accent);">✓</span>
                     <code style="background: var(--bg-input); padding: 2px 8px; border-radius: 4px;">{{ col }}</code>
@@ -81,7 +82,7 @@
     <!-- Hint to download template -->
     <div style="text-align: center; margin-top: 24px; color: var(--text-muted); font-size: 13px;">
         Não tem a planilha?
-        <a href="{{ url_for('balizamento.export_csv') }}" style="color: var(--accent);">
+        <a href="{{ url_for('balizamento.export_xlsx') }}" style="color: var(--accent);">
             Baixe o template de balizamento →
         </a>
     </div>

@@ -1,186 +1,170 @@
 """
-Export a wide-format Excel/CSV balizamento template.
+Balizamento: seeded XLSX export (one tab per competition group).
 
-New column layout (one row per student):
-  Nome | Matrícula | Ano Escolar | {Event} - Corrida 1 - Min | … Seg | … Cent | {Event} - Corrida 2 - Min | … | …
-
-This format is importable by Google Sheets, Excel, LibreOffice, etc.
+Sheet layout (one row per lane):
+  Série | Raia | Nome | Matrícula | Ano Escolar | Sala | Minutos | Segundos | Centésimos
 """
 
 import io
-import csv
-import unicodedata
+from collections import defaultdict
 
 from flask import Blueprint, render_template, send_file
 from models import Student, Event
+from services.seeding import build_series, COMPETITION_GROUPS, YEAR_TO_GROUP
 
 balizamento_bp = Blueprint("balizamento", __name__)
 
-SCHOOL_YEAR_ORDER = [
-    "6º Ano", "7º Ano", "8º Ano", "9º Ano",
-    "1º Ano Médio", "2º Ano Médio", "3º Ano Médio",
-]
-BASE_COLS = ["Nome", "Matrícula", "Ano Escolar"]
-TIME_FIELDS = ["Minutos", "Segundos", "Centésimos"]
+BASE_COLS = ["Série", "Raia", "Nome", "Matrícula", "Ano Escolar", "Sala"]
+TIME_COLS = ["Minutos", "Segundos", "Centésimos"]
+HEADER = BASE_COLS + TIME_COLS
+
+# ── Colour palette ────────────────────────────────────────────────────
+
+TAB_COLOURS = {
+    "6º e 7º Ano":  "163340",
+    "8º e 9º Ano":  "163322",
+    "Ensino Médio": "2D1A40",
+}
+HEADER_BG      = "1C2230"
+HEADER_FG      = "FFFFFF"
+ACCENT_FG      = "00C9B1"
+ODD_ROW_BG     = "1A2030"
+EVEN_ROW_BG    = "141824"
 
 
-def _year_sort_key(sy: str) -> int:
-    try:
-        return SCHOOL_YEAR_ORDER.index(sy)
-    except ValueError:
-        return 99
-
-
-def _col_name(event_name: str, corrida: int, field: str) -> str:
-    """e.g.  '50m Livre - Corrida 1 - Minutos'"""
-    return f"{event_name} - Corrida {corrida} - {field}"
-
-
-def _build_header_and_rows(students, events):
-    """
-    Build (header_row, data_rows) in wide format.
-    One data_row per student, sorted by school_year then name.
-    """
-    students_sorted = sorted(
-        students,
-        key=lambda s: (_year_sort_key(s.school_year), s.full_name),
-    )
-    events_sorted = sorted(events, key=lambda e: e.name)
-
-    # Build header
-    header = list(BASE_COLS)
-    for event in events_sorted:
-        for corrida in range(1, event.num_corridas + 1):
-            for field in TIME_FIELDS:
-                header.append(_col_name(event.name, corrida, field))
-
-    # Build data rows
-    rows = []
-    for student in students_sorted:
-        row = [student.full_name, student.registration, student.school_year]
-        for event in events_sorted:
-            for corrida in range(1, event.num_corridas + 1):
-                row.extend(["", "", ""])  # Minutos, Segundos, Centésimos (blank)
-        rows.append(row)
-
-    return header, rows
-
-
-# ── Routes ──────────────────────────────────────────────────────────
+# ── Route: preview page ───────────────────────────────────────────────
 
 @balizamento_bp.route("/balizamento")
 def balizamento():
     students = Student.query.order_by(Student.school_year, Student.full_name).all()
-    events = Event.query.order_by(Event.name).all()
-    header, _ = _build_header_and_rows(students, events) if (students and events) else ([], [])
-    return render_template("balizamento.html", students=students, events=events, header=header)
+    events   = Event.query.order_by(Event.name).all()
 
+    # Build preview: {group: [(event, series_list)]}
+    preview = _build_preview(events, students)
+    has_data = bool(students and events)
 
-@balizamento_bp.route("/balizamento/export")
-def export_csv():
-    """
-    Stream a plain CSV file (UTF-8 with BOM) compatible with
-    Excel, Google Sheets, LibreOffice Calc, etc.
-    """
-    students = Student.query.order_by(Student.school_year, Student.full_name).all()
-    events = Event.query.order_by(Event.name).all()
-    header, rows = _build_header_and_rows(students, events)
-
-    # Build into a plain str first, then encode — avoids TextIOWrapper detach issues
-    output = io.StringIO()
-    writer = csv.writer(output, lineterminator="\r\n")
-    writer.writerow(header)
-    writer.writerows(rows)
-    csv_str = output.getvalue()
-    output.close()
-
-    # Add UTF-8 BOM so Excel auto-detects the encoding on Windows/Mac
-    buf = io.BytesIO(b"\xef\xbb\xbf" + csv_str.encode("utf-8"))
-    buf.seek(0)
-
-    return send_file(
-        buf,
-        mimetype="text/csv",
-        as_attachment=True,
-        download_name="balizamento_template.csv",
+    return render_template(
+        "balizamento.html",
+        students=students,
+        events=events,
+        preview=preview,
+        has_data=has_data,
+        competition_groups=COMPETITION_GROUPS,
     )
 
 
+# ── Route: XLSX export ────────────────────────────────────────────────
+
 @balizamento_bp.route("/balizamento/export/xlsx")
 def export_xlsx():
-    """
-    Stream a proper .xlsx file with styled headers and auto-column widths.
-    This is the most compatible format for Google Sheets and Excel.
-    """
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
     students = Student.query.order_by(Student.school_year, Student.full_name).all()
-    events = Event.query.order_by(Event.name).all()
-    header, rows = _build_header_and_rows(students, events)
+    events   = Event.query.order_by(Event.name).all()
 
     wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Balizamento"
+    wb.remove(wb.active)  # remove default sheet
 
-    # ── Styles ──────────────────────────────────────────────────────
-    base_fill   = PatternFill("solid", fgColor="1C2230")
-    event_fills = [
-        PatternFill("solid", fgColor="163340"),
-        PatternFill("solid", fgColor="163322"),
-    ]
-    header_font = Font(bold=True, color="FFFFFF", size=10)
-    accent_font = Font(bold=True, color="00C9B1", size=10)
-    center      = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    thin_border = Border(
-        bottom=Side(border_style="thin", color="2D3748"),
-        right=Side(border_style="thin", color="2D3748"),
-    )
+    # Group events by competition_group (preserve display order)
+    grouped = defaultdict(list)
+    for ev in events:
+        key = ev.competition_group or "Sem Grupo"
+        grouped[key].append(ev)
 
-    # ── Header row ──────────────────────────────────────────────────
-    for col_idx, col_name in enumerate(header, start=1):
-        cell = ws.cell(row=1, column=col_idx, value=col_name)
-        cell.alignment = center
-        cell.border = thin_border
+    # Add a sheet for each group present
+    sheet_order = [g for g in COMPETITION_GROUPS if g in grouped]
+    if "Sem Grupo" in grouped:
+        sheet_order.append("Sem Grupo")
 
-        if col_idx <= len(BASE_COLS):
-            cell.fill = base_fill
-            cell.font = accent_font
-        else:
-            # Alternate fill per event block so it's visually grouped
-            # Find which event this column belongs to
-            time_col_idx = col_idx - len(BASE_COLS) - 1  # 0-based among time cols
-            events_sorted = sorted(events, key=lambda e: e.name)
-            col_count = 0
-            event_idx = 0
-            for ev_i, ev in enumerate(events_sorted):
-                block = ev.num_corridas * len(TIME_FIELDS)
-                if time_col_idx < col_count + block:
-                    event_idx = ev_i
-                    break
-                col_count += block
-            cell.fill = event_fills[event_idx % len(event_fills)]
-            cell.font = header_font
+    for group_name in sheet_order:
+        group_events = grouped[group_name]
 
-    ws.row_dimensions[1].height = 40
+        # Students eligible for this group
+        group_years  = _years_for_group(group_name)
+        group_students = [s for s in students if s.school_year in group_years] if group_years else students
 
-    # ── Freeze panes ────────────────────────────────────────────────
-    ws.freeze_panes = "D2"
+        ws = wb.create_sheet(title=_safe_sheet_name(group_name))
 
-    # ── Data rows ───────────────────────────────────────────────────
-    for row_idx, row in enumerate(rows, start=2):
-        for col_idx, value in enumerate(row, start=1):
-            cell = ws.cell(row=row_idx, column=col_idx, value=value)
-            cell.border = thin_border
-            if col_idx <= len(BASE_COLS):
-                cell.alignment = Alignment(vertical="center")
-            else:
+        tab_colour = TAB_COLOURS.get(group_name, "1C2230")
+        ws.sheet_properties.tabColor = tab_colour
+
+        # ── Styles ──────────────────────────────────────────────────
+        header_fill  = PatternFill("solid", fgColor=HEADER_BG)
+        accent_fill  = PatternFill("solid", fgColor=tab_colour)
+        odd_fill     = PatternFill("solid", fgColor=ODD_ROW_BG)
+        even_fill    = PatternFill("solid", fgColor=EVEN_ROW_BG)
+        h_font_base  = Font(bold=True, color=ACCENT_FG, size=10)
+        h_font_time  = Font(bold=True, color=HEADER_FG, size=10)
+        data_font    = Font(color=HEADER_FG, size=10)
+        center       = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        left_align   = Alignment(horizontal="left", vertical="center")
+        thin = Border(
+            bottom=Side(border_style="thin", color="2D3748"),
+            right=Side(border_style="thin", color="2D3748"),
+        )
+
+        current_row = 1
+
+        for ev in group_events:
+            # ── Event title row ──────────────────────────────────────
+            title_cell = ws.cell(row=current_row, column=1, value=f"🏁 {ev.name}")
+            title_cell.font = Font(bold=True, color=ACCENT_FG, size=12)
+            title_cell.fill = PatternFill("solid", fgColor=HEADER_BG)
+            title_cell.alignment = left_align
+            ws.merge_cells(
+                start_row=current_row, start_column=1,
+                end_row=current_row, end_column=len(HEADER)
+            )
+            ws.row_dimensions[current_row].height = 28
+            current_row += 1
+
+            # ── Column header row ────────────────────────────────────
+            for col_idx, col_name in enumerate(HEADER, start=1):
+                cell = ws.cell(row=current_row, column=col_idx, value=col_name)
+                cell.fill  = accent_fill if col_idx <= len(BASE_COLS) else header_fill
+                cell.font  = h_font_base if col_idx <= len(BASE_COLS) else h_font_time
                 cell.alignment = center
+                cell.border = thin
+            ws.row_dimensions[current_row].height = 36
+            ws.freeze_panes = ws.cell(row=current_row + 1, column=3)
+            current_row += 1
 
-    # ── Auto-width ──────────────────────────────────────────────────
-    for col in ws.columns:
-        max_len = max((len(str(cell.value or "")) for cell in col), default=0)
-        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 30)
+            # ── Seeded data rows ─────────────────────────────────────
+            all_series = build_series(ev, group_students)
+
+            for series_idx, series in enumerate(all_series, start=1):
+                for lane_idx, student in enumerate(series, start=1):
+                    row_fill = odd_fill if (current_row % 2 == 0) else even_fill
+                    row_data = [
+                        series_idx,
+                        lane_idx,
+                        student.full_name if student else "",
+                        student.registration if student else "",
+                        student.school_year if student else "",
+                        student.classroom or "" if student else "",
+                        "",  # Minutos
+                        "",  # Segundos
+                        "",  # Centésimos
+                    ]
+                    for col_idx, value in enumerate(row_data, start=1):
+                        cell = ws.cell(row=current_row, column=col_idx, value=value)
+                        cell.fill   = row_fill
+                        cell.font   = data_font
+                        cell.border = thin
+                        cell.alignment = center if col_idx <= 2 else left_align
+                    ws.row_dimensions[current_row].height = 22
+                    current_row += 1
+
+            # Spacer row between events
+            current_row += 1
+
+        # ── Column widths ────────────────────────────────────────────
+        col_widths = [8, 8, 28, 14, 18, 10, 12, 12, 14]
+        for i, w in enumerate(col_widths, start=1):
+            ws.column_dimensions[
+                openpyxl.utils.get_column_letter(i)
+            ].width = w
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -190,5 +174,31 @@ def export_xlsx():
         buf,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True,
-        download_name="balizamento_template.xlsx",
+        download_name="balizamento.xlsx",
     )
+
+
+# ── Helpers ───────────────────────────────────────────────────────────
+
+def _build_preview(events, students):
+    """Return {group: [(event, series_list)]} for template preview."""
+    grouped = defaultdict(list)
+    for ev in events:
+        key = ev.competition_group or "Sem Grupo"
+        group_years    = _years_for_group(key)
+        group_students = [s for s in students if s.school_year in group_years] if group_years else students
+        series_list    = build_series(ev, group_students)
+        grouped[key].append((ev, series_list))
+    return dict(grouped)
+
+
+def _years_for_group(group: str) -> list[str]:
+    """Return school years belonging to a competition group."""
+    return [y for y, g in YEAR_TO_GROUP.items() if g == group]
+
+
+def _safe_sheet_name(name: str) -> str:
+    """Truncate to 31 chars and strip illegal xlsx sheet name chars."""
+    bad = r'\/*?:[]'
+    clean = "".join(c for c in name if c not in bad)
+    return clean[:31]

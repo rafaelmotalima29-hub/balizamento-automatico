@@ -9,6 +9,7 @@ class Student(db.Model):
     full_name = db.Column(db.String(150), nullable=False)
     registration = db.Column(db.String(50), nullable=False, unique=True)
     school_year = db.Column(db.String(50), nullable=False)
+    classroom = db.Column(db.String(20), nullable=True)  # Sala (ex: 6A, 7B)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     results = db.relationship("Result", backref="student", lazy=True, cascade="all, delete-orphan")
@@ -22,13 +23,16 @@ class Event(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
-    num_corridas = db.Column(db.Integer, nullable=False, default=1)  # number of heats per student
+    num_corridas = db.Column(db.Integer, nullable=False, default=1)  # heats per student (legacy)
+    competition_group = db.Column(db.String(50), nullable=True)  # ex: "6º e 7º Ano"
+    num_series = db.Column(db.Integer, nullable=False, default=1)   # number of heats/bateries
+    athletes_per_series = db.Column(db.Integer, nullable=False, default=8)  # lanes per heat
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     results = db.relationship("Result", backref="event", lazy=True, cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<Event {self.name} ({self.num_corridas} corrida(s))>"
+        return f"<Event {self.name} ({self.competition_group})>"
 
 
 class Result(db.Model):

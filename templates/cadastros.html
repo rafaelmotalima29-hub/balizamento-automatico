@@ -38,18 +38,23 @@
                         <input type="text" id="registration" name="registration" placeholder="ex: 2025001" required />
                     </div>
                     <div class="form-group">
-                        <label for="school_year">Ano Escolar / Equipe</label>
-                        <select id="school_year" name="school_year" required>
-                            <option value="" disabled selected>Selecione...</option>
-                            <option>6º Ano</option>
-                            <option>7º Ano</option>
-                            <option>8º Ano</option>
-                            <option>9º Ano</option>
-                            <option>1º Ano Médio</option>
-                            <option>2º Ano Médio</option>
-                            <option>3º Ano Médio</option>
-                        </select>
+                        <label for="classroom">Sala <span
+                                style="color:var(--text-muted); font-weight:400;">(opcional)</span></label>
+                        <input type="text" id="classroom" name="classroom" placeholder="ex: 6A, 7B" />
                     </div>
+                </div>
+                <div class="form-group">
+                    <label for="school_year">Ano Escolar / Equipe</label>
+                    <select id="school_year" name="school_year" required>
+                        <option value="" disabled selected>Selecione...</option>
+                        <option>6º Ano</option>
+                        <option>7º Ano</option>
+                        <option>8º Ano</option>
+                        <option>9º Ano</option>
+                        <option>1º Ano Médio</option>
+                        <option>2º Ano Médio</option>
+                        <option>3º Ano Médio</option>
+                    </select>
                 </div>
                 <button type="submit" class="btn btn-primary" style="width:100%;">
                     Cadastrar Aluno
@@ -70,6 +75,7 @@
                         <tr>
                             <th>Nome</th>
                             <th>Matrícula</th>
+                            <th>Sala</th>
                             <th>Equipe</th>
                             <th></th>
                         </tr>
@@ -79,6 +85,7 @@
                         <tr id="student-row-{{ s.id }}">
                             <td>{{ s.full_name }}</td>
                             <td style="color: var(--text-muted);">{{ s.registration }}</td>
+                            <td style="color: var(--text-muted);">{{ s.classroom or '—' }}</td>
                             <td><span class="badge badge-accent">{{ s.school_year }}</span></td>
                             <td>
                                 <button class="btn btn-danger btn-sm btn-icon" title="Remover aluno" onclick="deleteRecord('{{ url_for('cadastros.delete_student', student_id=s.id) }}',
@@ -120,14 +127,28 @@
                     <input type="text" id="event_name" name="name" placeholder="ex: 50m Livre, 4x25m Misto" required />
                 </div>
                 <div class="form-group">
-                    <label for="num_corridas">Número de Corridas por Aluno</label>
-                    <input type="number" id="num_corridas" name="num_corridas" min="1" max="10" value="1" required />
-                    <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
-                        💡 Deixe <strong style="color: var(--text-secondary);">1</strong> se cada aluno nada apenas uma
-                        vez.
-                        Aumente para provas em que o aluno tem eliminatória + final, etc.
-                    </p>
+                    <label for="competition_group">Grupo de Competição</label>
+                    <select id="competition_group" name="competition_group" required>
+                        <option value="" disabled selected>Selecione...</option>
+                        {% for group in competition_groups %}
+                        <option value="{{ group }}">{{ group }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="num_series">Nº de Séries</label>
+                        <input type="number" id="num_series" name="num_series" min="1" max="50" value="1" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="athletes_per_series">Alunos por Série (Raias)</label>
+                        <input type="number" id="athletes_per_series" name="athletes_per_series" min="1" max="20"
+                            value="8" required />
+                    </div>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">
+                    💡 Ex: 2 séries × 8 raias = 16 alunos nessa prova.
+                </p>
                 <button type="submit" class="btn btn-primary" style="width:100%;">
                     Cadastrar Prova
                 </button>
@@ -147,7 +168,9 @@
                         <tr>
                             <th>#</th>
                             <th>Nome da Prova</th>
-                            <th>Corridas</th>
+                            <th>Grupo</th>
+                            <th>Séries</th>
+                            <th>Raias</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -156,7 +179,10 @@
                         <tr id="event-row-{{ e.id }}">
                             <td style="color: var(--text-muted);">{{ loop.index }}</td>
                             <td><strong>{{ e.name }}</strong></td>
-                            <td><span class="badge badge-accent">{{ e.num_corridas }}x</span></td>
+                            <td><span class="badge badge-accent" style="font-size:11px;">{{ e.competition_group or '—'
+                                    }}</span></td>
+                            <td style="color:var(--text-muted);">{{ e.num_series }}x</td>
+                            <td style="color:var(--text-muted);">{{ e.athletes_per_series }}</td>
                             <td>
                                 <button class="btn btn-danger btn-sm btn-icon" title="Remover prova" onclick="deleteRecord('{{ url_for('cadastros.delete_event', event_id=e.id) }}',
                                                 'event-row-{{ e.id }}',

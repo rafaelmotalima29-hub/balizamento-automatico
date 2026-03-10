@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Resultados{% endblock %}
+{% block page_title %}Resultados{% endblock %}
+{% block page_subtitle %}Visualização detalhada da competição{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('upload.upload') }}" class="btn btn-outline">⬆️ Novo Upload</a>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function showYearRanking(groupIdx, year) {
+        document.querySelectorAll('.year-ranking-table[data-group="' + groupIdx + '"]').forEach(function (t) {
+            t.style.display = 'none';
+        });
+        document.querySelectorAll('.year-tab-btn[data-group="' + groupIdx + '"]').forEach(function (b) {
+            b.classList.remove('active');
+        });
+        var safe = year.replace(/\s+/g, '_').replace(/[ºª]/g, '');
+        var table = document.getElementById('yt-' + groupIdx + '-' + safe);
+        if (table) table.style.display = 'block';
+        var btn = document.getElementById('yb-' + groupIdx + '-' + safe);
+        if (btn) btn.classList.add('active');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.first-year-btn').forEach(function (btn) {
+            btn.click();
+        });
+    });
+
+    function safeId(year) {
+        return year.replace(/\s+/g, '_').replace(/[ºª]/g, '');
+    }
+</script>
+{% endblock %}
+
+{% block content %}
+
+{% if not has_results %}
+<div class="empty-state">
+    <span class="empty-state-icon">🏆</span>
+    <h3>Nenhum resultado ainda</h3>
+    <p>Faça o upload da planilha preenchida para visualizar os resultados da competição.</p>
+    <br />
+    <a href="{{ url_for('upload.upload') }}" class="btn btn-primary">⬆️ Fazer Upload</a>
+</div>
+
+{% else %}
+
+{% for group in groups %}
+{% set gi = loop.index0 %}
+<div class="card" style="margin-bottom: 32px;">
+
+    <!-- Group header -->
+    <div class="card-header" style="margin-bottom: 20px;">
+        <div class="card-title" style="font-size: 20px;">🏊 {{ group.name }}</div>
+        <span class="count-pill">{{ group.full_ranking | length }} atletas</span>
+    </div>
+
+    <!-- ── PODIUM ──────────────────────────────────────────────── -->
+    {% if group.podium %}
+    <div style="margin-bottom: 28px;">
+        <div
+            style="font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 14px;">
+            🏅 Pódio do Grupo
+        </div>
+        <div style="display: flex; gap: 14px; flex-wrap: wrap;">
+            {% set medals = ['🥇', '🥈', '🥉'] %}
+            {% set med_colors = ['#FFD700', '#C0C0C0', '#CD7F32'] %}
+            {% for r in group.podium %}
+            {% set mi = loop.index0 %}
+            <div style="
+                flex: 1; min-width: 160px;
+                background: var(--bg-card);
+                border: 1px solid {{ med_colors[mi] }}55;
+                border-radius: 12px;
+                padding: 18px 16px;
+                text-align: center;">
+                <div style="font-size: 32px; margin-bottom: 6px;">{{ medals[mi] }}</div>
+                <div style="font-weight: 700; color: var(--text-primary); font-size: 15px; margin-bottom: 4px;">
+                    {{ r.student.full_name }}
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+                    {{ r.student.school_year }}{% if r.student.classroom %} · {{ r.student.classroom }}{% endif %}
+                </div>
+                {% set tt = r.total_time %}
+                {% set m = (tt // 60) | int %}
+                {% set s = (tt % 60) | int %}
+                {% set c = ((tt - tt | int) * 100) | round | int %}
+                <div
+                    style="font-size: 20px; font-weight: 700; color: {{ med_colors[mi] }}; font-variant-numeric: tabular-nums;">
+                    {{ m }}:{{ '%02d' | format(s) }}.{{ '%02d' | format(c) }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ── FULL RANKING ──────────────────────────────────────────── -->
+    <div style="margin-bottom: 28px;">
+        <div
+            style="font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 12px;">
+            📋 Classificação Geral
+        </div>
+        <div class="table-wrapper" style="border-radius: 10px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:50px;">Pos.</th>
+                        <th>Atleta</th>
+                        <th>Ano / Equipe</th>
+                        <th>Sala</th>
+                        <th>Tempo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in group.full_ranking %}
+                    {% set tt = entry.result.total_time %}
+                    {% set m = (tt // 60) | int %}
+                    {% set s = (tt % 60) | int %}
+                    {% set c = ((tt - tt | int) * 100) | round | int %}
+                    <tr>
+                        <td style="text-align:center; font-weight:700; color:var(--accent);">
+                            {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% elif entry.rank == 3 %}🥉{% else
+                            %}{{ entry.rank }}º{% endif %}
+                        </td>
+                        <td><strong>{{ entry.result.student.full_name }}</strong></td>
+                        <td><span class="badge badge-accent" style="font-size:11px;">{{ entry.result.student.school_year
+                                }}</span></td>
+                        <td style="color:var(--text-muted);">{{ entry.result.student.classroom or '—' }}</td>
+                        <td style="font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent);">
+                            {{ m }}:{{ '%02d' | format(s) }}.{{ '%02d' | format(c) }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ── PER-YEAR RANKINGS ──────────────────────────────────────── -->
+    {% if group.years | length > 1 %}
+    <div>
+        <div
+            style="font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 12px;">
+            🎓 Classificação por Ano Escolar
+        </div>
+        <div class="tabs" style="margin-bottom: 16px;">
+            {% for year in group.years %}
+            {% set safe = year | replace(' ', '_') | replace('º', '') | replace('ª', '') %}
+            <button id="yb-{{ gi }}-{{ safe }}"
+                class="tab-btn year-tab-btn {% if loop.first %}first-year-btn{% endif %}" data-group="{{ gi }}"
+                onclick="showYearRanking({{ gi }}, '{{ year }}')">
+                {{ year }} <span class="count-pill">{{ group.year_rankings[year] | length }}</span>
+            </button>
+            {% endfor %}
+        </div>
+
+        {% for year in group.years %}
+        {% set safe = year | replace(' ', '_') | replace('º', '') | replace('ª', '') %}
+        <div id="yt-{{ gi }}-{{ safe }}" class="year-ranking-table" data-group="{{ gi }}" style="display:none;">
+            <div class="table-wrapper" style="border-radius: 10px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:50px;">Pos.</th>
+                            <th>Atleta</th>
+                            <th>Sala</th>
+                            <th>Tempo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in group.year_rankings[year] %}
+                        {% set tt = entry.result.total_time %}
+                        {% set m = (tt // 60) | int %}
+                        {% set s = (tt % 60) | int %}
+                        {% set c = ((tt - tt | int) * 100) | round | int %}
+                        <tr>
+                            <td style="text-align:center; font-weight:700; color:var(--accent);">
+                                {% if entry.year_rank == 1 %}🥇{% elif entry.year_rank == 2 %}🥈{% elif entry.year_rank
+                                == 3 %}🥉{% else %}{{ entry.year_rank }}º{% endif %}
+                            </td>
+                            <td><strong>{{ entry.result.student.full_name }}</strong></td>
+                            <td style="color:var(--text-muted);">{{ entry.result.student.classroom or '—' }}</td>
+                            <td style="font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent);">
+                                {{ m }}:{{ '%02d' | format(s) }}.{{ '%02d' | format(c) }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</div>
+{% endfor %}
+
+{% endif %}
+
+<style>
+    .year-tab-btn.active {
+        background: var(--accent);
+        color: #000;
+        border-color: var(--accent);
+    }
+</style>
+
+{% endblock %}

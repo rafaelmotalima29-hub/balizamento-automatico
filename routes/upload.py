@@ -58,4 +58,4 @@ def process():
         for err in result["errors"]:
             flash(err, "warning")
 
-    return redirect(url_for("dashboard.index"))
+    return redirect(url_for("resultados.resultados"))
