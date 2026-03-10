@@ -6,22 +6,55 @@ from extensions import db
 
 
 def _migrate_db(db):
-    """Add new columns to existing SQLite DB without losing data."""
-    migrations = [
-        "ALTER TABLE events ADD COLUMN num_corridas INTEGER NOT NULL DEFAULT 1",
-        "ALTER TABLE results ADD COLUMN corrida_num INTEGER NOT NULL DEFAULT 1",
-        "ALTER TABLE students ADD COLUMN classroom VARCHAR(20)",
-        "ALTER TABLE events ADD COLUMN competition_group VARCHAR(50)",
-        "ALTER TABLE events ADD COLUMN num_series INTEGER NOT NULL DEFAULT 1",
-        "ALTER TABLE events ADD COLUMN athletes_per_series INTEGER NOT NULL DEFAULT 8",
+    """
+    Safely add new columns to existing tables without losing data.
+    Works for both SQLite and PostgreSQL.
+
+    On PostgreSQL, a failed statement inside a transaction puts the connection
+    in an aborted state — all subsequent commands also fail silently unless we
+    rollback explicitly after each failure.
+    """
+    # (table, column, definition)
+    columns_to_add = [
+        ("events",   "num_corridas",       "INTEGER NOT NULL DEFAULT 1"),
+        ("results",  "corrida_num",         "INTEGER NOT NULL DEFAULT 1"),
+        ("students", "classroom",           "VARCHAR(20)"),
+        ("events",   "competition_group",   "VARCHAR(50)"),
+        ("events",   "num_series",          "INTEGER NOT NULL DEFAULT 1"),
+        ("events",   "athletes_per_series", "INTEGER NOT NULL DEFAULT 8"),
     ]
+
+    is_postgres = "postgresql" in db.engine.url.drivername
+
     with db.engine.connect() as conn:
-        for stmt in migrations:
+        for table, column, definition in columns_to_add:
+            # Check if column already exists (avoids error entirely)
+            if is_postgres:
+                exists_query = text(
+                    "SELECT 1 FROM information_schema.columns "
+                    "WHERE table_name = :t AND column_name = :c"
+                )
+                row = conn.execute(exists_query, {"t": table, "c": column}).fetchone()
+            else:
+                # SQLite: PRAGMA table_info
+                row = conn.execute(
+                    text(f"PRAGMA table_info({table})")
+                ).fetchall()
+                row = next((r for r in row if r[1] == column), None)
+
+            if row:
+                continue  # Column already exists — skip
+
             try:
-                conn.execute(text(stmt))
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
                 conn.commit()
-            except Exception:
-                pass  # Column already exists — safe to ignore
+            except Exception as exc:
+                # Rollback so the connection is usable for the next column
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
 
 
 
