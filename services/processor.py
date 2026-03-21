@@ -251,10 +251,15 @@ def _process_xlsx_sheet(df_raw, time_data, errors, events_by_name):
         if len(non_empty) == 1 and non_empty[0][0] == 0:
             raw_title = non_empty[0][1]
             if not raw_title.replace(".", "", 1).isdigit():
-                # Non-numeric single-cell row → event title
-                norm_name = _normalize(raw_title)   # strips emoji, lowercases
-                current_event = events_by_name.get(norm_name)
-                col_map = None   # reset — next header row will set it
+                if "serie" in _normalize(raw_title) or "série" in raw_title.lower():
+                    pass # It's a "Série 1 de 2" separator row, do not reset col_map
+                else:
+                    # Non-numeric single-cell row → event title
+                    import re
+                    clean_title = re.sub(r'\s*\(.*?\)\s*$', '', raw_title)
+                    norm_name = _normalize(clean_title)   # strips emoji, lowercases
+                    current_event = events_by_name.get(norm_name)
+                    col_map = None   # reset — next header row will set it
             continue
 
         # ── Data row ─────────────────────────────────────────────
