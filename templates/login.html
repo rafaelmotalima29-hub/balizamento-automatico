@@ -58,9 +58,12 @@
           </div>
         </div>
 
-        <button type="submit" class="btn btn-primary btn-lg login-btn">
+        <button type="submit" class="btn btn-primary btn-lg login-btn" style="margin-bottom: 10px;">
           Entrar
         </button>
+        <a href="{{ url_for('auth.register') }}" class="btn btn-secondary btn-lg login-btn" style="background-color: transparent; color: var(--text-color, #333); border: 1px solid var(--border-color, #ccc);">
+          Criar nova conta
+        </a>
       </form>
     </div>
 
