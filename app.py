@@ -1,7 +1,7 @@
 import os
 from datetime import timedelta
 
-from flask import Flask
+from flask import Flask, render_template
 from flask_login import LoginManager
 from sqlalchemy import text
 
@@ -141,6 +141,13 @@ def create_app():
             _db_initialized = True
         except Exception:
             pass
+
+    # Global error handler – logs traceback to stderr on Vercel
+    @app.errorhandler(500)
+    def _handle_500(_exc):
+        import traceback, sys
+        traceback.print_exc(file=sys.stderr)
+        return render_template("login.html"), 500
 
     # Create DB tables + migrate existing ones + seed defaults
     # Wrapped in try/except so the app still boots on Vercel even if
