@@ -20,8 +20,14 @@ from collections import defaultdict
 from extensions import db
 from models import Student, Event, Result
 
-POINTS_TABLE = {1: 10, 2: 8, 3: 7, 4: 6, 5: 5, 6: 4, 7: 3, 8: 2, 9: 1}
 DQ_MINUTES = 9
+
+
+def _load_points_table() -> dict:
+    """Carrega a tabela de pontuação configurada no banco de dados."""
+    from models import ScoreConfig
+    rows = ScoreConfig.query.all()
+    return {row.placement: row.points for row in rows}
 
 
 # ── Tiny helpers ──────────────────────────────────────────────────────
@@ -38,8 +44,8 @@ def _convert_time(minutes: int, seconds: int, centesimos: int) -> float:
     return int(minutes) * 60 + int(seconds) + int(centesimos) / 100
 
 
-def _assign_points(rank: int) -> int:
-    return POINTS_TABLE.get(rank, 0)
+def _assign_points(rank: int, points_table: dict) -> int:
+    return points_table.get(rank, 0)
 
 
 def _safe_int(val, default=0) -> int:
@@ -149,7 +155,8 @@ def process_upload(filepath: str) -> dict:
     db.session.flush()
 
     # ── 5. Rank within (event, school_year) ─────────────────────────
-    student_map = {s.id: s for s in Student.query.all()}
+    points_table = _load_points_table()
+    student_map  = {s.id: s for s in Student.query.all()}
 
     groups = defaultdict(list)
     for row_data, res_obj in result_objs:
@@ -170,7 +177,7 @@ def process_upload(filepath: str) -> dict:
             else:
                 rank = i + 1
             res_obj.placement = rank
-            res_obj.points    = _assign_points(rank)
+            res_obj.points    = _assign_points(rank, points_table)
 
         for _, res_obj in disq:
             res_obj.placement = None

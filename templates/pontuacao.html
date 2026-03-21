@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}Configuração de Pontuação{% endblock %}
+{% block page_title %}Configuração de Pontuação{% endblock %}
+{% block page_subtitle %}Defina quantos pontos cada colocação vale{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-outline" id="btn-reset" title="Restaurar pontuação padrão">
+  ↩ Restaurar padrão
+</button>
+<button class="btn btn-primary" id="btn-save">
+  💾 Salvar configuração
+</button>
+{% endblock %}
+
+{% block content %}
+
+<div class="card" style="max-width: 680px;">
+  <div class="card-header">
+    <h2 class="card-title">🎯 Tabela de Pontuação</h2>
+    <p class="card-subtitle">
+      Cada colocação recebe os pontos definidos abaixo. Colocações não listadas
+      valem <strong>0 pontos</strong>. As alterações afetam apenas os próximos
+      uploads de resultados.
+    </p>
+  </div>
+
+  <div id="score-table-wrap">
+    <table class="table" id="score-table">
+      <thead>
+        <tr>
+          <th style="width:56px; text-align:center;">#</th>
+          <th>Colocação</th>
+          <th style="width:140px;">Pontos</th>
+          <th style="width:56px;"></th>
+        </tr>
+      </thead>
+      <tbody id="score-body">
+        {% for row in rows %}
+        <tr data-placement="{{ row.placement }}">
+          <td style="text-align:center; color:var(--text-muted); font-size:13px;">
+            {{ loop.index }}
+          </td>
+          <td>
+            <span class="placement-badge">{{ row.placement }}º lugar</span>
+          </td>
+          <td>
+            <input
+              type="number"
+              class="input points-input"
+              value="{{ row.points }}"
+              min="0"
+              max="9999"
+              data-placement="{{ row.placement }}"
+              style="width:100px;"
+            />
+          </td>
+          <td>
+            <button class="btn-icon btn-delete" title="Remover colocação" data-placement="{{ row.placement }}">
+              🗑
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div style="margin-top:16px; display:flex; gap:12px; align-items:center;">
+    <button class="btn btn-outline" id="btn-add">
+      + Adicionar colocação
+    </button>
+    <span id="add-hint" style="font-size:13px; color:var(--text-muted);">
+      Próxima colocação a ser adicionada: <strong id="next-placement">—</strong>
+    </span>
+  </div>
+</div>
+
+<!-- Preview card -->
+<div class="card" style="max-width: 680px; margin-top: 24px;">
+  <div class="card-header">
+    <h2 class="card-title">👁 Pré-visualização</h2>
+    <p class="card-subtitle">Como a tabela ficará após salvar.</p>
+  </div>
+  <table class="table" id="preview-table">
+    <thead>
+      <tr>
+        <th>Colocação</th>
+        <th>Pontos</th>
+        <th>Barra</th>
+      </tr>
+    </thead>
+    <tbody id="preview-body"></tbody>
+  </table>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast" style="display:none;"></div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<style>
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px; margin-bottom: 0; }
+  .card-header { margin-bottom: 20px; }
+  .card-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .card-subtitle { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+  .placement-badge {
+    display: inline-block;
+    background: var(--accent-dark);
+    color: var(--accent);
+    border: 1px solid var(--border-accent);
+    border-radius: var(--radius-sm);
+    padding: 2px 10px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition);
+    opacity: 0.6;
+  }
+  .btn-icon:hover { background: rgba(248,81,73,0.15); opacity: 1; }
+
+  .points-input {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: 6px 10px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color var(--transition);
+  }
+  .points-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .bar-fill {
+    height: 10px;
+    border-radius: 99px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+    min-width: 4px;
+    transition: width 0.3s ease;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    z-index: 9999;
+    animation: slideUp 0.25s ease;
+  }
+  .toast.success { border-color: var(--success); color: var(--success); }
+  .toast.error   { border-color: var(--danger);  color: var(--danger);  }
+  @keyframes slideUp {
+    from { opacity:0; transform:translateY(12px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  /* Reset confirm modal */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200;
+    animation: fadeIn 0.2s ease;
+  }
+  .modal-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 32px 28px;
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+  }
+  .modal-box h3 { font-size: 16px; margin-bottom: 10px; }
+  .modal-box p  { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+  .modal-actions { display:flex; gap:12px; justify-content:center; }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+</style>
+
+<script>
+(function () {
+  /* ──────── State ──────── */
+  let rows = [
+    {% for row in rows %}
+    { placement: {{ row.placement }}, points: {{ row.points }} },
+    {% endfor %}
+  ];
+
+  /* ──────── DOM helpers ──────── */
+  const tbody      = document.getElementById("score-body");
+  const pbody      = document.getElementById("preview-body");
+  const nextBadge  = document.getElementById("next-placement");
+  const toast      = document.getElementById("toast");
+
+  /* ──────── Render score table row ──────── */
+  function renderRow(row, idx) {
+    const tr = document.createElement("tr");
+    tr.dataset.placement = row.placement;
+    tr.innerHTML = `
+      <td style="text-align:center;color:var(--text-muted);font-size:13px;">${idx + 1}</td>
+      <td><span class="placement-badge">${row.placement}º lugar</span></td>
+      <td>
+        <input type="number" class="input points-input"
+          value="${row.points}" min="0" max="9999"
+          data-placement="${row.placement}"
+          style="width:100px;" />
+      </td>
+      <td>
+        <button class="btn-icon btn-delete" title="Remover colocação"
+          data-placement="${row.placement}">🗑</button>
+      </td>`;
+    return tr;
+  }
+
+  /* ──────── Render preview ──────── */
+  function renderPreview() {
+    const maxPts = Math.max(...rows.map(r => r.points), 1);
+    pbody.innerHTML = rows
+      .slice()
+      .sort((a, b) => a.placement - b.placement)
+      .map(r => {
+        const pct = Math.round((r.points / maxPts) * 100);
+        return `<tr>
+          <td><span class="placement-badge">${r.placement}º lugar</span></td>
+          <td><strong style="color:var(--accent);">${r.points}</strong> pts</td>
+          <td style="width:160px;">
+            <div class="bar-fill" style="width:${pct}%;"></div>
+          </td>
+        </tr>`;
+      })
+      .join("");
+  }
+
+  /* ──────── Update "next placement" hint ──────── */
+  function updateNextHint() {
+    const existing = new Set(rows.map(r => r.placement));
+    let next = 1;
+    while (existing.has(next)) next++;
+    nextBadge.textContent = `${next}º lugar`;
+  }
+
+  /* ──────── Full re-render ──────── */
+  function reRender() {
+    rows.sort((a, b) => a.placement - b.placement);
+    tbody.innerHTML = "";
+    rows.forEach((row, idx) => tbody.appendChild(renderRow(row, idx)));
+    renderPreview();
+    updateNextHint();
+    attachListeners();
+  }
+
+  /* ──────── Attach listeners to dynamic elements ──────── */
+  function attachListeners() {
+    tbody.querySelectorAll(".points-input").forEach(input => {
+      input.addEventListener("input", e => {
+        const placement = parseInt(e.target.dataset.placement);
+        const val       = Math.max(0, parseInt(e.target.value) || 0);
+        const rowObj    = rows.find(r => r.placement === placement);
+        if (rowObj) { rowObj.points = val; renderPreview(); }
+      });
+    });
+
+    tbody.querySelectorAll(".btn-delete").forEach(btn => {
+      btn.addEventListener("click", e => {
+        const placement = parseInt(btn.dataset.placement);
+        rows = rows.filter(r => r.placement !== placement);
+        reRender();
+      });
+    });
+  }
+
+  /* ──────── Add placement ──────── */
+  document.getElementById("btn-add").addEventListener("click", () => {
+    const existing = new Set(rows.map(r => r.placement));
+    let next = 1;
+    while (existing.has(next)) next++;
+    rows.push({ placement: next, points: 0 });
+    reRender();
+    // Focus the new input
+    const newInput = tbody.querySelector(`[data-placement="${next}"]`);
+    if (newInput) newInput.focus();
+  });
+
+  /* ──────── Save ──────── */
+  document.getElementById("btn-save").addEventListener("click", async () => {
+    const btn = document.getElementById("btn-save");
+    btn.disabled = true;
+    btn.textContent = "Salvando…";
+
+    // Sync current input values before sending
+    tbody.querySelectorAll(".points-input").forEach(input => {
+      const placement = parseInt(input.dataset.placement);
+      const rowObj    = rows.find(r => r.placement === placement);
+      if (rowObj) rowObj.points = Math.max(0, parseInt(input.value) || 0);
+    });
+
+    try {
+      const res = await fetch("/pontuacao/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(rows),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        showToast(`✅ ${json.saved} colocações salvas com sucesso!`, "success");
+      } else {
+        showToast(`❌ ${json.error}`, "error");
+      }
+    } catch (err) {
+      showToast("❌ Erro ao salvar. Tente novamente.", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "💾 Salvar configuração";
+    }
+  });
+
+  /* ──────── Reset (com confirmação) ──────── */
+  document.getElementById("btn-reset").addEventListener("click", () => {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal-box">
+        <h3>↩ Restaurar pontuação padrão?</h3>
+        <p>Todos os valores atuais serão substituídos pela configuração padrão:<br>
+          1º=10, 2º=8, 3º=7, 4º=6, 5º=5, 6º=4, 7º=3, 8º=2, 9º=1.</p>
+        <div class="modal-actions">
+          <button class="btn btn-outline" id="modal-cancel">Cancelar</button>
+          <form method="POST" action="/pontuacao/reset" style="margin:0;">
+            <button type="submit" class="btn btn-primary">Restaurar</button>
+          </form>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector("#modal-cancel").addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+  });
+
+  /* ──────── Toast ──────── */
+  let toastTimer;
+  function showToast(msg, type = "success") {
+    clearTimeout(toastTimer);
+    toast.textContent = msg;
+    toast.className   = `toast ${type}`;
+    toast.style.display = "block";
+    toastTimer = setTimeout(() => { toast.style.display = "none"; }, 3500);
+  }
+
+  /* ──────── Init ──────── */
+  reRender();
+})();
+</script>
+{% endblock %}

@@ -56,6 +56,11 @@
         class="nav-link {% if request.endpoint == 'resultados.resultados' %}active{% endif %}">
         <span class="nav-icon">🏆</span> Resultados
       </a>
+
+      <a href="{{ url_for('pontuacao.pontuacao') }}"
+        class="nav-link {% if request.endpoint and 'pontuacao' in request.endpoint %}active{% endif %}">
+        <span class="nav-icon">⚙️</span> Pontuação
+      </a>
     </nav>
 
     <div class="sidebar-footer">

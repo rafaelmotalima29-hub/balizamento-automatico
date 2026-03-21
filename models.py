@@ -2,6 +2,20 @@ from datetime import datetime
 from extensions import db
 
 
+class ScoreConfig(db.Model):
+    """
+    Tabela de pontuação configurável.
+    Cada linha associa uma colocação (1º, 2º, …) a uma quantidade de pontos.
+    """
+    __tablename__ = "score_config"
+
+    placement = db.Column(db.Integer, primary_key=True)   # 1, 2, 3 …
+    points    = db.Column(db.Integer, nullable=False, default=0)
+
+    def __repr__(self):
+        return f"<ScoreConfig {self.placement}º → {self.points} pts>"
+
+
 class Student(db.Model):
     __tablename__ = "students"
 

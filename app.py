@@ -5,6 +5,9 @@ from config import Config
 from extensions import db
 
 
+_DEFAULT_SCORE_CONFIG = {1: 10, 2: 8, 3: 7, 4: 6, 5: 5, 6: 4, 7: 3, 8: 2, 9: 1}
+
+
 def _migrate_db(db):
     """
     Safely add new columns to existing tables without losing data.
@@ -56,6 +59,15 @@ def _migrate_db(db):
                     pass
 
 
+def _seed_score_config(db):
+    """Insere a pontuação padrão se a tabela estiver vazia."""
+    from models import ScoreConfig
+    if ScoreConfig.query.count() == 0:
+        for placement, points in _DEFAULT_SCORE_CONFIG.items():
+            db.session.add(ScoreConfig(placement=placement, points=points))
+        db.session.commit()
+
+
 
 
 def create_app():
@@ -75,6 +87,7 @@ def create_app():
     from routes.upload import upload_bp
     from routes.resultados import resultados_bp
     from routes.cancelamentos import cancelamentos_bp
+    from routes.pontuacao import pontuacao_bp
 
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(cadastros_bp)
@@ -82,11 +95,13 @@ def create_app():
     app.register_blueprint(upload_bp)
     app.register_blueprint(resultados_bp)
     app.register_blueprint(cancelamentos_bp)
+    app.register_blueprint(pontuacao_bp)
 
-    # Create DB tables + migrate existing ones
+    # Create DB tables + migrate existing ones + seed defaults
     with app.app_context():
         db.create_all()
         _migrate_db(db)
+        _seed_score_config(db)
 
     return app
 
