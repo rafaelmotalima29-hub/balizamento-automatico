@@ -77,12 +77,14 @@ def build_series(
 
     all_series: list[list[Optional[Student]]] = []
 
+    if is_single:
+        combined = _merge_pools(pools, group_years)
+
     for series_idx in range(num_series):
         series: list[Optional[Student]] = []
 
         if is_single:
             # No alternation — just pull from the combined pool in order
-            combined = _merge_pools(pools, group_years)
             for _ in range(athletes_per_series):
                 series.append(combined.popleft() if combined else None)
         else:
