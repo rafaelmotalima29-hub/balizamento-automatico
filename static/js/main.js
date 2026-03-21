@@ -3,8 +3,8 @@
 ═══════════════════════════════════════════ */
 
 // ── Sidebar (mobile) ────────────────────────────────────────────────
-const sidebar = document.getElementById("sidebar");
-const overlay = document.getElementById("sidebar-overlay");
+const sidebar  = document.getElementById("sidebar");
+const overlay  = document.getElementById("sidebar-overlay");
 const hamburger = document.getElementById("hamburger");
 
 hamburger?.addEventListener("click", () => {
@@ -14,6 +14,13 @@ hamburger?.addEventListener("click", () => {
 overlay?.addEventListener("click", () => {
     sidebar.classList.remove("open");
     overlay.classList.remove("active");
+});
+// Close sidebar on nav link click (mobile)
+sidebar?.querySelectorAll(".nav-link").forEach(link => {
+    link.addEventListener("click", () => {
+        sidebar.classList.remove("open");
+        overlay.classList.remove("active");
+    });
 });
 
 // ── Tabs (Cadastros) ─────────────────────────────────────────────────
@@ -29,19 +36,18 @@ function togglePanel(panelId) {
     document.getElementById(panelId)?.classList.toggle("open");
 }
 
-// Auto-open first accordion panel on page load
 document.addEventListener("DOMContentLoaded", () => {
     const firstPanel = document.querySelector(".event-panel");
     firstPanel?.classList.add("open");
 });
 
 // ── Drag & Drop Upload ───────────────────────────────────────────────
-const dropZone = document.getElementById("drop-zone");
+const dropZone  = document.getElementById("drop-zone");
 const fileInput = document.getElementById("file-input");
 const filePreview = document.getElementById("file-preview");
-const fileName = document.getElementById("file-name");
+const fileName  = document.getElementById("file-name");
 const uploadBtn = document.getElementById("upload-btn");
-const dropIcon = document.getElementById("drop-icon");
+const dropIcon  = document.getElementById("drop-icon");
 const dropTitle = document.getElementById("drop-title");
 
 function onFileSelected(file) {
@@ -53,23 +59,15 @@ function onFileSelected(file) {
     dropTitle.textContent = "Arquivo pronto para envio";
 }
 
-fileInput?.addEventListener("change", () => {
-    onFileSelected(fileInput.files[0]);
-});
+fileInput?.addEventListener("change", () => { onFileSelected(fileInput.files[0]); });
 
-dropZone?.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    dropZone.classList.add("drag-over");
-});
-dropZone?.addEventListener("dragleave", () => {
-    dropZone.classList.remove("drag-over");
-});
+dropZone?.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+dropZone?.addEventListener("dragleave", () => { dropZone.classList.remove("drag-over"); });
 dropZone?.addEventListener("drop", (e) => {
     e.preventDefault();
     dropZone.classList.remove("drag-over");
     const file = e.dataTransfer.files[0];
     if (file) {
-        // Assign to input
         const dt = new DataTransfer();
         dt.items.add(file);
         fileInput.files = dt.files;
@@ -77,27 +75,8 @@ dropZone?.addEventListener("drop", (e) => {
     }
 });
 
-// ── Delete record (fetch DELETE) ─────────────────────────────────────
-async function deleteRecord(url, rowId, label) {
-    if (!confirm(`Remover "${label}"? Esta ação não pode ser desfeita.`)) return;
-
-    try {
-        const res = await fetch(url, { method: "DELETE" });
-        if (res.ok) {
-            const row = document.getElementById(rowId);
-            row?.classList.add("deleting");
-            setTimeout(() => row?.remove(), 350);
-        } else {
-            alert("Erro ao remover. Tente novamente.");
-        }
-    } catch {
-        alert("Falha de conexão. Tente novamente.");
-    }
-}
-
-// ── Upload form loading state ────────────────────────────────────────
-const uploadForm = document.getElementById("upload-form");
-uploadForm?.addEventListener("submit", () => {
+// ── Upload form loading state ─────────────────────────────────────────
+document.getElementById("upload-form")?.addEventListener("submit", () => {
     if (uploadBtn) {
         uploadBtn.disabled = true;
         uploadBtn.textContent = "⏳ Processando…";
@@ -106,9 +85,7 @@ uploadForm?.addEventListener("submit", () => {
 
 // ── Flash auto-dismiss ───────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
-    const flashes = document.querySelectorAll(".flash");
-    flashes.forEach((f) => {
-        // Errors stay longer so the user has time to read them
+    document.querySelectorAll(".flash").forEach((f) => {
         const delay = f.classList.contains("flash-error") ? 10000 : 5000;
         setTimeout(() => {
             f.style.opacity = "0";
@@ -118,3 +95,117 @@ document.addEventListener("DOMContentLoaded", () => {
         }, delay);
     });
 });
+
+/* ═══════════════════════════════════════════
+   TOAST NOTIFICATIONS
+═══════════════════════════════════════════ */
+let _toastContainer = null;
+
+function showToast(message, type = "info") {
+    if (!_toastContainer) {
+        _toastContainer = document.createElement("div");
+        _toastContainer.className = "toast-container";
+        document.body.appendChild(_toastContainer);
+    }
+
+    const icons = { success: "✅", error: "❌", warning: "⚠️", info: "ℹ️" };
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `<span>${icons[type] || "ℹ️"}</span><span>${message}</span>`;
+    _toastContainer.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(12px) scale(0.96)";
+        toast.style.transition = "all 0.35s ease";
+        setTimeout(() => toast.remove(), 350);
+    }, 3500);
+}
+
+/* ═══════════════════════════════════════════
+   CONFIRM MODAL (replaces browser confirm())
+═══════════════════════════════════════════ */
+let _modalResolve = null;
+
+function _ensureModal() {
+    if (document.getElementById("confirm-modal")) return;
+
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.id = "confirm-modal";
+    overlay.innerHTML = `
+        <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+            <span class="modal-icon" id="modal-icon">⚠️</span>
+            <div class="modal-title" id="modal-title">Confirmar</div>
+            <div class="modal-body" id="modal-body"></div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" id="modal-cancel">Cancelar</button>
+                <button class="btn btn-danger" id="modal-confirm">Remover</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+
+    document.getElementById("modal-cancel").addEventListener("click", () => _resolveModal(false));
+    document.getElementById("modal-confirm").addEventListener("click", () => _resolveModal(true));
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) _resolveModal(false); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") _resolveModal(false); });
+}
+
+function _resolveModal(value) {
+    const overlay = document.getElementById("confirm-modal");
+    if (overlay) overlay.classList.remove("active");
+    if (_modalResolve) { _modalResolve(value); _modalResolve = null; }
+}
+
+function showConfirm(title, body, confirmLabel = "Remover", icon = "🗑️") {
+    _ensureModal();
+    document.getElementById("modal-icon").textContent = icon;
+    document.getElementById("modal-title").textContent = title;
+    document.getElementById("modal-body").innerHTML = body;
+    document.getElementById("modal-confirm").textContent = confirmLabel;
+    document.getElementById("confirm-modal").classList.add("active");
+    return new Promise(resolve => { _modalResolve = resolve; });
+}
+
+/* ═══════════════════════════════════════════
+   DELETE RECORD (fetch DELETE with modal)
+═══════════════════════════════════════════ */
+async function confirmDelete(url, rowId, label) {
+    const confirmed = await showConfirm(
+        "Confirmar remoção",
+        `Deseja remover <strong>${label}</strong>? Esta ação não pode ser desfeita.`,
+        "Remover",
+        "🗑️"
+    );
+    if (!confirmed) return;
+
+    try {
+        const res = await fetch(url, { method: "DELETE" });
+        if (res.ok) {
+            const row = document.getElementById(rowId);
+            if (row) {
+                row.classList.add("deleting");
+                setTimeout(() => {
+                    row.remove();
+                    // Recalculate visible count
+                    const tbody = document.getElementById("students-tbody");
+                    if (tbody) {
+                        const visible = [...tbody.querySelectorAll("tr")].filter(r => r.style.display !== "none").length;
+                        const pill = document.getElementById("students-visible-count");
+                        if (pill) pill.textContent = visible;
+                    }
+                }, 350);
+            }
+            showToast(`"${label}" removido com sucesso.`, "success");
+        } else {
+            showToast("Erro ao remover. Tente novamente.", "error");
+        }
+    } catch {
+        showToast("Falha de conexão. Tente novamente.", "error");
+    }
+}
+
+// Legacy alias (delete without label — not used but kept for safety)
+async function deleteRecord(url, rowId, label) {
+    return confirmDelete(url, rowId, label);
+}

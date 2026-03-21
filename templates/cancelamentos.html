@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}Cancelamentos{% endblock %}
+{% block page_title %}Cancelamentos & DQs{% endblock %}
+{% block page_subtitle %}Gerencie ausências e desclassificações por prova{% endblock %}
+
+{% block content %}
+
+{% if not events %}
+<div class="empty-state" style="margin-top: 60px;">
+    <span class="empty-state-icon">⚠️</span>
+    <h3>Nenhuma prova cadastrada</h3>
+    <p>Cadastre provas antes de gerenciar cancelamentos.</p>
+    <a href="{{ url_for('cadastros.cadastros') }}" class="btn btn-primary" style="margin-top: 20px;">
+        Ir para Cadastros
+    </a>
+</div>
+{% else %}
+
+<!-- ── Event Selector ─────────────────────────────────────── -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <div class="card-title">🏁 Selecione a Prova</div>
+    </div>
+    <div class="form-group" style="margin-bottom: 0;">
+        <select id="event-select" onchange="loadEventStudents(this.value)">
+            <option value="">Escolha uma prova para gerenciar...</option>
+            {% for group in competition_groups %}
+            {% set group_events = [] %}
+            {% for e in events %}{% if e.competition_group == group %}{% set _ = group_events.append(e) %}{% endif %}{% endfor %}
+            {% if group_events %}
+            <optgroup label="{{ group }}">
+                {% for e in group_events %}
+                <option value="{{ e.id }}">{{ e.name }} — {{ e.num_series }} série(s) × {{ e.athletes_per_series }} raias</option>
+                {% endfor %}
+            </optgroup>
+            {% endif %}
+            {% endfor %}
+            {% set ungrouped = [] %}
+            {% for e in events %}{% if not e.competition_group %}{% set _ = ungrouped.append(e) %}{% endif %}{% endfor %}
+            {% if ungrouped %}
+            <optgroup label="Sem grupo definido">
+                {% for e in ungrouped %}
+                <option value="{{ e.id }}">{{ e.name }}</option>
+                {% endfor %}
+            </optgroup>
+            {% endif %}
+        </select>
+    </div>
+</div>
+
+<!-- ── No Event Selected placeholder ─────────────────────── -->
+<div id="no-event-msg" style="text-align: center; padding: 60px 20px; color: var(--text-muted);">
+    <span style="font-size: 52px; display: block; margin-bottom: 16px;">👆</span>
+    <p style="font-size: 15px;">Selecione uma prova acima para gerenciar ausências e DQs</p>
+</div>
+
+<!-- ── Students Panel ─────────────────────────────────────── -->
+<div id="students-panel" style="display: none;">
+
+    <!-- Toolbar -->
+    <div class="dq-toolbar">
+        <div class="search-bar">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="dq-search" placeholder="Buscar aluno por nome ou matrícula..." oninput="renderStudents()" autocomplete="off" />
+        </div>
+        <div id="year-filters" class="filter-pills"></div>
+    </div>
+
+    <!-- Student list card -->
+    <div class="card" style="padding: 0; overflow: hidden;">
+        <div class="card-header" style="padding: 16px 20px;">
+            <div class="card-title" id="panel-event-name">🤽 Alunos</div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="dq-count-badge" class="badge badge-danger" style="display:none;"></span>
+                <span id="students-count" class="count-pill">0</span>
+            </div>
+        </div>
+
+        <!-- Loading state -->
+        <div id="students-loading" style="display: none; padding: 48px; text-align: center; color: var(--text-muted);">
+            <span style="font-size: 36px; display: block; margin-bottom: 12px;">⏳</span>
+            Carregando alunos...
+        </div>
+
+        <!-- Content -->
+        <div id="students-list-wrapper"></div>
+    </div>
+
+    <!-- Info note -->
+    <div class="info-note" style="margin-top: 16px;">
+        <span style="font-size: 18px; flex-shrink: 0;">💡</span>
+        <div>
+            Marcar <strong style="color: var(--danger);">DQ / Ausente</strong> salva imediatamente no banco de dados.
+            O ranking de pontos é recalculado na próxima vez que você fizer upload dos resultados.
+        </div>
+    </div>
+</div>
+
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let allStudents = [];
+let activeYear = 'all';
+
+async function loadEventStudents(eventId) {
+    const panel = document.getElementById('students-panel');
+    const noMsg = document.getElementById('no-event-msg');
+    const loading = document.getElementById('students-loading');
+    const wrapper = document.getElementById('students-list-wrapper');
+
+    if (!eventId) {
+        panel.style.display = 'none';
+        noMsg.style.display = 'block';
+        return;
+    }
+
+    panel.style.display = 'block';
+    noMsg.style.display = 'none';
+    loading.style.display = 'block';
+    wrapper.innerHTML = '';
+    activeYear = 'all';
+
+    try {
+        const res = await fetch(`/api/event/${eventId}/students`);
+        if (!res.ok) throw new Error('Erro de servidor');
+        const data = await res.json();
+        allStudents = data.students;
+
+        document.getElementById('panel-event-name').textContent =
+            `🤽 ${data.event.name}${data.event.competition_group ? ' — ' + data.event.competition_group : ''}`;
+
+        buildYearFilters(allStudents);
+        renderStudents();
+    } catch (e) {
+        wrapper.innerHTML = `
+            <div class="empty-state" style="padding: 48px;">
+                <span class="empty-state-icon">❌</span>
+                <h3>Erro ao carregar</h3>
+                <p>Não foi possível carregar os alunos. Tente novamente.</p>
+            </div>`;
+    } finally {
+        loading.style.display = 'none';
+    }
+}
+
+function buildYearFilters(students) {
+    const years = [...new Set(students.map(s => s.school_year))].sort();
+    const container = document.getElementById('year-filters');
+    if (years.length <= 1) { container.innerHTML = ''; return; }
+
+    let html = `<button class="filter-pill active" onclick="setYearFilter('all', this)">Todos</button>`;
+    years.forEach(y => {
+        html += `<button class="filter-pill" onclick="setYearFilter('${y}', this)">${y}</button>`;
+    });
+    container.innerHTML = html;
+}
+
+function setYearFilter(year, btn) {
+    activeYear = year;
+    document.querySelectorAll('#year-filters .filter-pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    renderStudents();
+}
+
+function renderStudents() {
+    const search = (document.getElementById('dq-search')?.value || '').toLowerCase().trim();
+
+    const filtered = allStudents.filter(s => {
+        if (activeYear !== 'all' && s.school_year !== activeYear) return false;
+        if (search) {
+            return s.full_name.toLowerCase().includes(search) ||
+                   s.registration.toLowerCase().includes(search);
+        }
+        return true;
+    });
+
+    // Update DQ badge
+    const dqCount = filtered.filter(s => s.result?.is_dq).length;
+    const badge = document.getElementById('dq-count-badge');
+    badge.style.display = dqCount > 0 ? 'inline-flex' : 'none';
+    if (dqCount > 0) badge.textContent = `${dqCount} DQ`;
+
+    document.getElementById('students-count').textContent = filtered.length;
+
+    const wrapper = document.getElementById('students-list-wrapper');
+
+    if (filtered.length === 0) {
+        wrapper.innerHTML = `
+            <div class="empty-state" style="padding: 48px;">
+                <span class="empty-state-icon">🔍</span>
+                <h3>Nenhum aluno encontrado</h3>
+                <p>Tente ajustar o filtro ou a busca.</p>
+            </div>`;
+        return;
+    }
+
+    const eventId = document.getElementById('event-select').value;
+    const isMobile = window.innerWidth < 640;
+    isMobile ? renderCards(filtered, eventId) : renderTable(filtered, eventId);
+}
+
+function statusBadge(student) {
+    if (student.result?.is_dq) return '<span class="badge badge-danger">DQ / Ausente</span>';
+    if (student.result && student.result.total_time != null)
+        return `<span class="badge badge-accent">${student.result.time_display}</span>`;
+    return '<span class="badge badge-muted">Sem resultado</span>';
+}
+
+function renderTable(students, eventId) {
+    let html = `
+        <div class="table-wrapper" style="border: none; border-radius: 0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Matrícula</th>
+                        <th>Sala</th>
+                        <th>Ano</th>
+                        <th>Status</th>
+                        <th style="text-align:right;">Ação</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+    students.forEach(s => {
+        const isDQ = s.result?.is_dq;
+        const rowStyle = isDQ ? 'style="opacity:0.65;"' : '';
+        const btnClass = isDQ ? 'btn-outline' : 'btn-danger';
+        const btnText = isDQ ? '✓ Reativar' : '✕ Marcar DQ';
+
+        html += `
+            <tr id="dq-row-${s.id}" ${rowStyle}>
+                <td><strong>${escHtml(s.full_name)}</strong></td>
+                <td style="color:var(--text-muted);">${escHtml(s.registration)}</td>
+                <td style="color:var(--text-muted);">${escHtml(s.classroom) || '—'}</td>
+                <td><span class="badge badge-accent" style="font-size:11px;">${escHtml(s.school_year)}</span></td>
+                <td id="dq-status-${s.id}">${statusBadge(s)}</td>
+                <td style="text-align:right;">
+                    <button class="btn ${btnClass} btn-sm" id="dq-btn-${s.id}"
+                        onclick="toggleDQ(${s.id}, ${eventId}, this)">
+                        ${btnText}
+                    </button>
+                </td>
+            </tr>`;
+    });
+
+    html += '</tbody></table></div>';
+    document.getElementById('students-list-wrapper').innerHTML = html;
+}
+
+function renderCards(students, eventId) {
+    let html = '<div class="dq-card-list">';
+
+    students.forEach(s => {
+        const isDQ = s.result?.is_dq;
+        const cardStyle = isDQ ? 'opacity:0.7;' : '';
+        const btnClass = isDQ ? 'btn-outline' : 'btn-danger';
+        const btnText = isDQ ? '✓ Reativar' : '✕ DQ';
+
+        html += `
+            <div id="dq-row-${s.id}" class="dq-card" style="${cardStyle}">
+                <div class="dq-card-info">
+                    <div class="dq-card-name">${escHtml(s.full_name)}</div>
+                    <div class="dq-card-meta">
+                        ${escHtml(s.registration)} · ${escHtml(s.school_year)}${s.classroom ? ' · ' + escHtml(s.classroom) : ''}
+                    </div>
+                    <div style="margin-top: 6px;" id="dq-status-${s.id}">${statusBadge(s)}</div>
+                </div>
+                <button class="btn ${btnClass} btn-sm" id="dq-btn-${s.id}"
+                    onclick="toggleDQ(${s.id}, ${eventId}, this)" style="flex-shrink:0;">
+                    ${btnText}
+                </button>
+            </div>`;
+    });
+
+    html += '</div>';
+    document.getElementById('students-list-wrapper').innerHTML = html;
+}
+
+async function toggleDQ(studentId, eventId, btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳';
+
+    try {
+        const res = await fetch('/api/result/toggle-dq', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ student_id: studentId, event_id: parseInt(eventId) }),
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+            const student = allStudents.find(s => s.id === studentId);
+            if (student) {
+                if (!student.result) student.result = { total_time: null };
+                student.result.is_dq = data.is_dq;
+                student.result.time_display = data.is_dq ? 'DQ' : student.result.time_display;
+            }
+            renderStudents();
+            showToast(data.is_dq ? 'Aluno marcado como DQ/Ausente.' : 'Aluno reativado com sucesso.', data.is_dq ? 'warning' : 'success');
+        } else {
+            showToast(data.error || 'Erro ao atualizar status.', 'error');
+            btn.disabled = false;
+        }
+    } catch (e) {
+        showToast('Falha de conexão. Tente novamente.', 'error');
+        btn.disabled = false;
+    }
+}
+
+function escHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+window.addEventListener('resize', () => {
+    if (allStudents.length > 0) renderStudents();
+});
+</script>
+{% endblock %}

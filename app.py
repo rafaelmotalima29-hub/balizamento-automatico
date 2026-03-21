@@ -74,12 +74,14 @@ def create_app():
     from routes.balizamento import balizamento_bp
     from routes.upload import upload_bp
     from routes.resultados import resultados_bp
+    from routes.cancelamentos import cancelamentos_bp
 
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(cadastros_bp)
     app.register_blueprint(balizamento_bp)
     app.register_blueprint(upload_bp)
     app.register_blueprint(resultados_bp)
+    app.register_blueprint(cancelamentos_bp)
 
     # Create DB tables + migrate existing ones
     with app.app_context():

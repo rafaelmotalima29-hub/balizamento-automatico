@@ -9,7 +9,7 @@
 <!-- ── Tabs ──────────────────────────────────────────────────────── -->
 <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('alunos', this)" id="tab-alunos">
-        🤽 Alunos <span class="count-pill">{{ students | length }}</span>
+        🤽 Alunos <span class="count-pill" id="tab-pill-alunos">{{ students | length }}</span>
     </button>
     <button class="tab-btn" onclick="switchTab('provas', this)" id="tab-provas">
         🏁 Provas <span class="count-pill">{{ events | length }}</span>
@@ -20,27 +20,26 @@
      TAB: ALUNOS
 ══════════════════════════════════════════ -->
 <div class="tab-pane active" id="pane-alunos">
-    <div class="grid-2">
+    <div class="cadastro-layout">
 
-        <!-- Add Student Form -->
-        <div class="card">
+        <!-- ── Add Student Form ── -->
+        <div class="card cadastro-form-col">
             <div class="card-header">
                 <div class="card-title">➕ Cadastrar Aluno</div>
             </div>
-            <form method="POST" action="{{ url_for('cadastros.add_student') }}">
+            <form method="POST" action="{{ url_for('cadastros.add_student') }}" id="form-add-student">
                 <div class="form-group">
                     <label for="full_name">Nome Completo</label>
-                    <input type="text" id="full_name" name="full_name" placeholder="ex: João Silva" required />
+                    <input type="text" id="full_name" name="full_name" placeholder="ex: João Silva" required autocomplete="off" />
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="registration">Matrícula</label>
-                        <input type="text" id="registration" name="registration" placeholder="ex: 2025001" required />
+                        <input type="text" id="registration" name="registration" placeholder="ex: 2025001" required autocomplete="off" />
                     </div>
                     <div class="form-group">
-                        <label for="classroom">Sala <span
-                                style="color:var(--text-muted); font-weight:400;">(opcional)</span></label>
-                        <input type="text" id="classroom" name="classroom" placeholder="ex: 6A, 7B" />
+                        <label for="classroom">Sala <span style="color:var(--text-muted);font-weight:400;">(opcional)</span></label>
+                        <input type="text" id="classroom" name="classroom" placeholder="ex: 6A, 7B" autocomplete="off" />
                     </div>
                 </div>
                 <div class="form-group">
@@ -62,15 +61,33 @@
             </form>
         </div>
 
-        <!-- Student List -->
-        <div class="card" style="padding: 0; overflow: hidden;">
-            <div class="card-header" style="padding: 18px 20px;">
+        <!-- ── Student List ── -->
+        <div class="card cadastro-list-col" style="padding: 0; overflow: hidden;">
+            <div class="card-header" style="padding: 16px 20px;">
                 <div class="card-title">📋 Alunos Cadastrados</div>
-                <span class="count-pill">{{ students | length }}</span>
+                <span class="count-pill" id="students-visible-count">{{ students | length }}</span>
             </div>
+
             {% if students %}
-            <div class="table-wrapper" style="border: none; border-radius: 0;">
-                <table>
+            <!-- Search + Filter toolbar -->
+            <div class="list-toolbar">
+                <div class="search-bar">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="student-search" placeholder="Buscar por nome ou matrícula..." oninput="filterStudents()" autocomplete="off" />
+                </div>
+                <div class="filter-pills" id="year-filter-pills">
+                    <button class="filter-pill active" onclick="setStudentYear('all', this)">Todos</button>
+                    {% set years = [] %}
+                    {% for s in students %}{% if s.school_year not in years %}{% set _ = years.append(s.school_year) %}{% endif %}{% endfor %}
+                    {% for y in years | sort %}
+                    <button class="filter-pill" onclick="setStudentYear('{{ y }}', this)">{{ y }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Desktop table -->
+            <div class="table-wrapper student-table-wrap" style="border:none; border-radius:0;">
+                <table id="students-table">
                     <thead>
                         <tr>
                             <th>Nome</th>
@@ -80,17 +97,21 @@
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="students-tbody">
                         {% for s in students %}
-                        <tr id="student-row-{{ s.id }}">
-                            <td>{{ s.full_name }}</td>
-                            <td style="color: var(--text-muted);">{{ s.registration }}</td>
-                            <td style="color: var(--text-muted);">{{ s.classroom or '—' }}</td>
+                        <tr id="student-row-{{ s.id }}"
+                            data-name="{{ s.full_name | lower }}"
+                            data-registration="{{ s.registration | lower }}"
+                            data-year="{{ s.school_year }}">
+                            <td><strong>{{ s.full_name }}</strong></td>
+                            <td style="color:var(--text-muted);">{{ s.registration }}</td>
+                            <td style="color:var(--text-muted);">{{ s.classroom or '—' }}</td>
                             <td><span class="badge badge-accent">{{ s.school_year }}</span></td>
-                            <td>
-                                <button class="btn btn-danger btn-sm btn-icon" title="Remover aluno" onclick="deleteRecord('{{ url_for('cadastros.delete_student', student_id=s.id) }}',
-                                                'student-row-{{ s.id }}',
-                                                '{{ s.full_name }}')">
+                            <td style="text-align:right;">
+                                <button class="btn btn-danger btn-sm btn-icon" title="Remover aluno"
+                                    onclick="confirmDelete('{{ url_for('cadastros.delete_student', student_id=s.id) }}',
+                                                         'student-row-{{ s.id }}',
+                                                         '{{ s.full_name }}')">
                                     🗑️
                                 </button>
                             </td>
@@ -99,8 +120,15 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- No results (after filter) -->
+            <div id="students-no-results" style="display:none; padding: 40px; text-align:center; color: var(--text-muted);">
+                <span style="font-size:32px;">🔍</span>
+                <p style="margin-top: 10px;">Nenhum aluno encontrado para esse filtro.</p>
+            </div>
+
             {% else %}
-            <div class="empty-state" style="padding: 40px;">
+            <div class="empty-state" style="padding: 48px;">
                 <span class="empty-state-icon">🤽</span>
                 <h3>Nenhum aluno</h3>
                 <p>Cadastre o primeiro aluno usando o formulário ao lado.</p>
@@ -115,9 +143,10 @@
      TAB: PROVAS
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="pane-provas">
-    <div class="grid-2">
+    <div class="cadastro-layout">
 
-        <div class="card">
+        <!-- ── Add Event Form ── -->
+        <div class="card cadastro-form-col">
             <div class="card-header">
                 <div class="card-title">➕ Cadastrar Prova</div>
             </div>
@@ -141,12 +170,11 @@
                         <input type="number" id="num_series" name="num_series" min="1" max="50" value="1" required />
                     </div>
                     <div class="form-group">
-                        <label for="athletes_per_series">Alunos por Série (Raias)</label>
-                        <input type="number" id="athletes_per_series" name="athletes_per_series" min="1" max="20"
-                            value="8" required />
+                        <label for="athletes_per_series">Raias por Série</label>
+                        <input type="number" id="athletes_per_series" name="athletes_per_series" min="1" max="20" value="8" required />
                     </div>
                 </div>
-                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">
+                <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
                     💡 Ex: 2 séries × 8 raias = 16 alunos nessa prova.
                 </p>
                 <button type="submit" class="btn btn-primary" style="width:100%;">
@@ -155,18 +183,30 @@
             </form>
         </div>
 
-        <!-- Event List -->
-        <div class="card" style="padding: 0; overflow: hidden;">
-            <div class="card-header" style="padding: 18px 20px;">
+        <!-- ── Event List ── -->
+        <div class="card cadastro-list-col" style="padding: 0; overflow: hidden;">
+            <div class="card-header" style="padding: 16px 20px;">
                 <div class="card-title">🏁 Provas Cadastradas</div>
                 <span class="count-pill">{{ events | length }}</span>
             </div>
+
             {% if events %}
-            <div class="table-wrapper" style="border: none; border-radius: 0;">
+            <!-- Filter by group -->
+            <div class="list-toolbar" style="border-bottom: 1px solid var(--border);">
+                <div class="filter-pills">
+                    <button class="filter-pill active" onclick="setEventGroup('all', this)">Todos</button>
+                    {% set groups = [] %}
+                    {% for e in events %}{% if e.competition_group and e.competition_group not in groups %}{% set _ = groups.append(e.competition_group) %}{% endif %}{% endfor %}
+                    {% for g in groups | sort %}
+                    <button class="filter-pill" onclick="setEventGroup('{{ g }}', this)">{{ g }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="table-wrapper" style="border:none; border-radius:0;">
                 <table>
                     <thead>
                         <tr>
-                            <th>#</th>
                             <th>Nome da Prova</th>
                             <th>Grupo</th>
                             <th>Séries</th>
@@ -174,19 +214,18 @@
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="events-tbody">
                         {% for e in events %}
-                        <tr id="event-row-{{ e.id }}">
-                            <td style="color: var(--text-muted);">{{ loop.index }}</td>
+                        <tr id="event-row-{{ e.id }}" data-group="{{ e.competition_group or '' }}">
                             <td><strong>{{ e.name }}</strong></td>
-                            <td><span class="badge badge-accent" style="font-size:11px;">{{ e.competition_group or '—'
-                                    }}</span></td>
-                            <td style="color:var(--text-muted);">{{ e.num_series }}x</td>
+                            <td><span class="badge badge-accent" style="font-size:11px;">{{ e.competition_group or '—' }}</span></td>
+                            <td style="color:var(--text-muted);">{{ e.num_series }}×</td>
                             <td style="color:var(--text-muted);">{{ e.athletes_per_series }}</td>
-                            <td>
-                                <button class="btn btn-danger btn-sm btn-icon" title="Remover prova" onclick="deleteRecord('{{ url_for('cadastros.delete_event', event_id=e.id) }}',
-                                                'event-row-{{ e.id }}',
-                                                '{{ e.name }}')">
+                            <td style="text-align:right;">
+                                <button class="btn btn-danger btn-sm btn-icon" title="Remover prova"
+                                    onclick="confirmDelete('{{ url_for('cadastros.delete_event', event_id=e.id) }}',
+                                                         'event-row-{{ e.id }}',
+                                                         '{{ e.name }}')">
                                     🗑️
                                 </button>
                             </td>
@@ -196,7 +235,7 @@
                 </table>
             </div>
             {% else %}
-            <div class="empty-state" style="padding: 40px;">
+            <div class="empty-state" style="padding: 48px;">
                 <span class="empty-state-icon">🏁</span>
                 <h3>Nenhuma prova</h3>
                 <p>Cadastre as provas do evento usando o formulário ao lado.</p>
@@ -207,4 +246,52 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Student filter state ─────────────────────────────────────────────
+let activeStudentYear = 'all';
+
+function filterStudents() {
+    const search = (document.getElementById('student-search')?.value || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('#students-tbody tr');
+    let visible = 0;
+
+    rows.forEach(row => {
+        const name = row.dataset.name || '';
+        const reg  = row.dataset.registration || '';
+        const year = row.dataset.year || '';
+
+        const matchYear   = activeStudentYear === 'all' || year === activeStudentYear;
+        const matchSearch = !search || name.includes(search) || reg.includes(search);
+
+        const show = matchYear && matchSearch;
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+
+    document.getElementById('students-visible-count').textContent = visible;
+    const noResults = document.getElementById('students-no-results');
+    if (noResults) noResults.style.display = visible === 0 ? 'block' : 'none';
+}
+
+function setStudentYear(year, btn) {
+    activeStudentYear = year;
+    document.querySelectorAll('#year-filter-pills .filter-pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    filterStudents();
+}
+
+// ── Event filter state ───────────────────────────────────────────────
+function setEventGroup(group, btn) {
+    document.querySelectorAll('.filter-pills .filter-pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+
+    document.querySelectorAll('#events-tbody tr').forEach(row => {
+        const g = row.dataset.group || '';
+        row.style.display = (group === 'all' || g === group) ? '' : 'none';
+    });
+}
+</script>
 {% endblock %}
