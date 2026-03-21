@@ -1,10 +1,13 @@
 """
 Upload processor — reads the seeded XLSX format produced by balizamento.py.
 
-Expected sheet columns (one row per lane):
-  Série | Raia | Nome | Matrícula | Ano Escolar | Sala | Minutos | Segundos | Centésimos
+Expected XLSX structure (one sheet per competition group):
+  • Row 1 per event block: merged title cell  e.g. "🏁 50m Livre"
+  • Row 2: column headers  Série | Raia | Nome | Matrícula | Ano Escolar | Sala | Minutos | Segundos | Centésimos
+  • Rows 3+: one row per lane
 
-Multiple sheets (one per competition group) are all processed.
+Multiple events may appear in the same sheet (each preceded by its title row).
+Multiple sheets are all processed.
 
 DQ convention: Minutos == 9 → disqualified/absent.
 """
@@ -50,38 +53,47 @@ def _safe_int(val, default=0) -> int:
 
 def process_upload(filepath: str) -> dict:
     """
-    Parse uploaded XLSX (seeded format, multi-sheet), compute rankings,
+    Parse uploaded file (CSV or XLSX/XLS seeded format), compute rankings,
     persist Results, return summary dict.
     """
     # ── 1. Load all sheets ───────────────────────────────────────────
     try:
         if filepath.lower().endswith(".csv"):
-            sheets = {"Sheet1": pd.read_csv(filepath, dtype=str, encoding="utf-8-sig")}
+            # CSV: read with explicit headers
+            df = pd.read_csv(filepath, dtype=str, encoding="utf-8-sig")
+            df.columns = [str(c).strip() for c in df.columns]
+            sheets_plain = {"Sheet1": df}
+            sheets_raw = {}
         else:
             xl = pd.ExcelFile(filepath)
-            sheets = {name: xl.parse(name, dtype=str) for name in xl.sheet_names}
+            sheets_plain = {}
+            # Read without header=0 so we can detect our custom structure
+            # (the app exports a merged title row before the column-header row)
+            sheets_raw = {
+                name: xl.parse(name, dtype=str, header=None)
+                for name in xl.sheet_names
+            }
     except Exception as exc:
         return {"processed": 0, "errors": [f"Erro ao ler arquivo: {exc}"], "skipped": 0}
 
     errors = []
-    # key: (student, corrida_num=1) → {min, seg, cent, serie, event}
-    # We use the event implied by the sheet + student matching
-    # Actually: one result per student per event (aluno só nada uma série por prova)
-    time_data: dict = {}  # (student_id, event_id) → {min, seg, cent}
+    # (student_id, event_id) → {min, seg, cent}
+    time_data: dict = {}
     events_all = Event.query.all()
     events_by_name = {_normalize(e.name): e for e in events_all}
 
     # ── 2. Process each sheet ────────────────────────────────────────
-    for sheet_name, df in sheets.items():
-        df.columns = [str(c).strip() for c in df.columns]
-
-        # Detect format: seeded (has "Série") vs legacy (has event-corrida cols)
+    # CSV: standard column-header format
+    for sheet_name, df in sheets_plain.items():
         norm_cols = {_normalize(c): c for c in df.columns}
-
         if "serie" in norm_cols or "série" in norm_cols:
             _process_seeded_sheet(df, norm_cols, time_data, errors, events_by_name)
         else:
             _process_legacy_sheet(df, time_data, errors, events_all)
+
+    # XLSX/XLS: handle custom multi-event format with title rows
+    for sheet_name, df_raw in sheets_raw.items():
+        _process_xlsx_sheet(df_raw, time_data, errors, events_by_name)
 
     if not time_data:
         return {
@@ -137,9 +149,7 @@ def process_upload(filepath: str) -> dict:
     db.session.flush()
 
     # ── 5. Rank within (event, school_year) ─────────────────────────
-    # Pull student for ranking
     student_map = {s.id: s for s in Student.query.all()}
-    event_map   = {e.id: e for e in events_all}
 
     groups = defaultdict(list)
     for row_data, res_obj in result_objs:
@@ -156,7 +166,7 @@ def process_upload(filepath: str) -> dict:
         rank = 1
         for i, (row_data, res_obj) in enumerate(valid):
             if i > 0 and row_data["total_time"] == valid[i - 1][0]["total_time"]:
-                pass  # tie
+                pass  # tie — same rank
             else:
                 rank = i + 1
             res_obj.placement = rank
@@ -170,17 +180,125 @@ def process_upload(filepath: str) -> dict:
     return {"processed": len(rows_to_process), "errors": errors, "skipped": 0}
 
 
-# ── Format parsers ────────────────────────────────────────────────────
+# ── XLSX multi-event parser (primary format) ──────────────────────────
+
+# Keywords that identify a column-header row
+_HEADER_MARKERS = {"serie", "série"}
+
+
+def _process_xlsx_sheet(df_raw, time_data, errors, events_by_name):
+    """
+    Parse a raw (header=None) DataFrame from one XLSX sheet.
+
+    Handles the app-generated seeded format:
+      - Event title row: merged cell; only column 0 has a value (non-numeric text)
+      - Column header row: contains "Série" / "série" in one of the cells
+      - Data rows: one per lane
+      - Empty spacer rows: between event blocks
+
+    Also handles plain XLSX (no title row) where row 0 is the header row.
+    In that case current_event stays None and _event_for_student() is used as fallback.
+    """
+    current_event = None
+    col_map = None   # field_name → column index
+
+    for row_idx in range(len(df_raw)):
+        row = df_raw.iloc[row_idx]
+        # Stringify all values; treat NaN / "nan" as empty
+        row_strs = [str(v).strip() for v in row]
+        non_empty = [
+            (i, v) for i, v in enumerate(row_strs)
+            if v and v.lower() not in ("nan", "none")
+        ]
+
+        # Empty row → skip (spacer between events)
+        if not non_empty:
+            continue
+
+        norm_strs = [_normalize(v) for v in row_strs]
+
+        # ── Header row detection ──────────────────────────────────
+        # A header row contains "série" or "serie" as one of the cell values.
+        if any(nv in _HEADER_MARKERS for nv in norm_strs):
+            col_map = {}
+            for ci, nv in enumerate(norm_strs):
+                if nv in ("serie", "série"):
+                    col_map["serie"] = ci
+                elif nv == "raia":
+                    col_map["raia"] = ci
+                elif nv in ("matricula", "matrícula"):
+                    col_map["matricula"] = ci
+                elif nv in ("nome", "nome completo"):
+                    col_map["nome"] = ci
+                elif nv == "minutos":
+                    col_map["min"] = ci
+                elif nv == "segundos":
+                    col_map["seg"] = ci
+                elif nv in ("centesimos", "centésimos"):
+                    col_map["cent"] = ci
+            continue
+
+        # ── Event title row detection ─────────────────────────────
+        # The merged title cell produces exactly one non-empty value in column 0.
+        # Guard: make sure it's non-numeric text (not a lone série number like "1").
+        if len(non_empty) == 1 and non_empty[0][0] == 0:
+            raw_title = non_empty[0][1]
+            if not raw_title.replace(".", "", 1).isdigit():
+                # Non-numeric single-cell row → event title
+                norm_name = _normalize(raw_title)   # strips emoji, lowercases
+                current_event = events_by_name.get(norm_name)
+                col_map = None   # reset — next header row will set it
+            continue
+
+        # ── Data row ─────────────────────────────────────────────
+        if col_map is None or "matricula" not in col_map:
+            continue
+
+        registration = row_strs[col_map["matricula"]]
+        if not registration or registration.lower() in ("nan", "", "none"):
+            continue
+
+        min_raw  = row_strs[col_map["min"]]  if "min"  in col_map else ""
+        seg_raw  = row_strs[col_map["seg"]]  if "seg"  in col_map else ""
+        cent_raw = row_strs[col_map["cent"]] if "cent" in col_map else ""
+
+        if any(v.lower() in ("", "nan", "none", "-") for v in [min_raw, seg_raw, cent_raw]):
+            continue
+
+        line = row_idx + 1
+        student = Student.query.filter_by(registration=registration).first()
+        if not student:
+            errors.append(f"Linha {line}: Matrícula '{registration}' não encontrada.")
+            continue
+
+        # Use event detected from title row; fall back to group-based lookup
+        event = current_event or _event_for_student(student)
+        if not event:
+            errors.append(
+                f"Linha {line}: Nenhuma prova encontrada para '{student.full_name}' "
+                f"({student.school_year})."
+            )
+            continue
+
+        key = (student.id, event.id)
+        if key not in time_data:
+            time_data[key] = {
+                "min":  _safe_int(min_raw),
+                "seg":  _safe_int(seg_raw),
+                "cent": _safe_int(cent_raw),
+            }
+
+
+# ── CSV seeded-format parser ───────────────────────────────────────────
 
 def _process_seeded_sheet(df, norm_cols, time_data, errors, events_by_name):
-    """Parse the seeded multi-series format (Série|Raia|Nome|Matrícula|…|Min|Seg|Cent)."""
+    """Parse the seeded CSV format (Série|Raia|Nome|Matrícula|…|Min|Seg|Cent)."""
     matricula_col = norm_cols.get("matricula") or norm_cols.get("matrícula")
     min_col  = norm_cols.get("minutos")
     seg_col  = norm_cols.get("segundos")
     cent_col = norm_cols.get("centesimos") or norm_cols.get("centésimos")
 
     if not all([matricula_col, min_col, seg_col, cent_col]):
-        # Skip rows that are event-title separators (merged cells become NaN)
         return
 
     for row_idx, df_row in df.iterrows():
@@ -193,7 +311,6 @@ def _process_seeded_sheet(df, norm_cols, time_data, errors, events_by_name):
         seg_raw  = str(df_row.get(seg_col, "")).strip()
         cent_raw = str(df_row.get(cent_col, "")).strip()
 
-        # All three must be present
         if any(v.lower() in ("", "nan", "none", "-") for v in [min_raw, seg_raw, cent_raw]):
             continue
 
@@ -202,8 +319,7 @@ def _process_seeded_sheet(df, norm_cols, time_data, errors, events_by_name):
             errors.append(f"Linha {line}: Matrícula '{registration}' não encontrada.")
             continue
 
-        # Find which event this student belongs to based on their school_year
-        event = _event_for_student(student, events_by_name)
+        event = _event_for_student(student)
         if not event:
             errors.append(f"Linha {line}: Nenhuma prova encontrada para o aluno '{student.full_name}'.")
             continue
@@ -217,18 +333,18 @@ def _process_seeded_sheet(df, norm_cols, time_data, errors, events_by_name):
             }
 
 
-def _event_for_student(student, events_by_name):
-    """Find the first event whose competition_group matches the student's school_year."""
+def _event_for_student(student):
+    """Fallback: find the first event whose competition_group matches the student's school_year."""
     from services.seeding import YEAR_TO_GROUP
     student_group = YEAR_TO_GROUP.get(student.school_year)
-    from models import Event
     for event in Event.query.all():
         if event.competition_group == student_group:
             return event
     return None
 
 
-# Legacy wide-format parser (kept for backwards compatibility)
+# ── Legacy wide-format parser (backwards compatibility) ───────────────
+
 _COL_PATTERN = re.compile(
     r"^(.+)\s*-\s*corrida\s+(\d+)\s*-\s*(minuto|segundo|centesimo|cent)",
     re.IGNORECASE,

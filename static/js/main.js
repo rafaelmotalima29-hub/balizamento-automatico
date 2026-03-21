@@ -95,15 +95,26 @@ async function deleteRecord(url, rowId, label) {
     }
 }
 
+// ── Upload form loading state ────────────────────────────────────────
+const uploadForm = document.getElementById("upload-form");
+uploadForm?.addEventListener("submit", () => {
+    if (uploadBtn) {
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = "⏳ Processando…";
+    }
+});
+
 // ── Flash auto-dismiss ───────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
     const flashes = document.querySelectorAll(".flash");
     flashes.forEach((f) => {
+        // Errors stay longer so the user has time to read them
+        const delay = f.classList.contains("flash-error") ? 10000 : 5000;
         setTimeout(() => {
             f.style.opacity = "0";
             f.style.transform = "translateY(-8px)";
             f.style.transition = "all 0.4s ease";
             setTimeout(() => f?.remove(), 400);
-        }, 5000);
+        }, delay);
     });
 });

@@ -10,7 +10,6 @@ Groups results by competition_group and provides:
 from collections import defaultdict
 from flask import Blueprint, render_template
 
-from extensions import db
 from models import Student, Event, Result
 
 resultados_bp = Blueprint("resultados", __name__)
@@ -82,12 +81,20 @@ def resultados():
             yr = entry["result"].student.school_year
             year_rankings[yr].append(entry)
 
-        # Re-rank within each year
+        # Re-rank within each year (with tie handling)
         for yr in year_rankings:
             entries = year_rankings[yr]
             entries.sort(key=lambda e: e["result"].total_time)
+            prev_time = None
+            yr_rank_counter = 1
+            current_yr_rank = 1
             for i, entry in enumerate(entries):
-                entry["year_rank"] = i + 1
+                t = entry["result"].total_time
+                if t != prev_time:
+                    current_yr_rank = yr_rank_counter
+                    prev_time = t
+                entry["year_rank"] = current_yr_rank
+                yr_rank_counter += 1
 
         groups_data.append({
             "name": group_name,
