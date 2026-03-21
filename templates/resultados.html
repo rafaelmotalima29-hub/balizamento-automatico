@@ -170,6 +170,7 @@
         {% for year in group.years %}
         {% set safe = year | replace(' ', '_') | replace('º', '') | replace('ª', '') %}
         <div id="yt-{{ gi }}-{{ safe }}" class="year-ranking-table" data-group="{{ gi }}" style="display:none;">
+            <div class="print-year-label">{{ year }}</div>
             <div class="table-wrapper" style="border-radius: 10px;">
                 <table>
                     <thead>
@@ -216,6 +217,43 @@
         background: var(--accent);
         color: #000;
         border-color: var(--accent);
+    }
+
+    .print-year-label {
+        display: none;
+    }
+
+    @media print {
+        .print-year-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #6b7280;
+            margin-bottom: 6px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #e5e9f0;
+        }
+
+        /* Cabeçalho de cada grupo (título da seção) */
+        .card-header .card-title {
+            font-size: 15px !important;
+            font-weight: 700 !important;
+            color: #111827 !important;
+        }
+
+        /* Pódio: cards dos atletas */
+        .card > div > div[style*="flex: 1"] {
+            background: #f4f6f9 !important;
+            border-color: #d1d9e0 !important;
+            color: #111827 !important;
+        }
+
+        /* Ocultar o botão de imprimir e exportar */
+        .topbar-actions, [onclick="window.print()"] {
+            display: none !important;
+        }
     }
 </style>
 
