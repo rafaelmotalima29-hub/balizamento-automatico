@@ -25,6 +25,7 @@ def _migrate_db(db):
         ("events",   "competition_group",   "VARCHAR(50)"),
         ("events",   "num_series",          "INTEGER NOT NULL DEFAULT 1"),
         ("events",   "athletes_per_series", "INTEGER NOT NULL DEFAULT 8"),
+        ("results",  "is_dq",              "BOOLEAN NOT NULL DEFAULT FALSE"),
     ]
 
     is_postgres = "postgresql" in db.engine.url.drivername
@@ -57,6 +58,16 @@ def _migrate_db(db):
                     conn.rollback()
                 except Exception:
                     pass
+
+
+def _fix_null_booleans(db):
+    """Ensure is_dq has no NULLs (old rows before NOT NULL constraint)."""
+    try:
+        with db.engine.connect() as conn:
+            conn.execute(text("UPDATE results SET is_dq = FALSE WHERE is_dq IS NULL"))
+            conn.commit()
+    except Exception:
+        pass
 
 
 def _seed_score_config(db):
@@ -97,11 +108,37 @@ def create_app():
     app.register_blueprint(cancelamentos_bp)
     app.register_blueprint(pontuacao_bp)
 
+    # Lazy DB init: ensure tables exist on first request if cold start failed
+    _db_initialized = False
+
+    @app.before_request
+    def _ensure_db():
+        nonlocal _db_initialized
+        if _db_initialized:
+            return
+        try:
+            db.create_all()
+            _migrate_db(db)
+            _fix_null_booleans(db)
+            _seed_score_config(db)
+            _db_initialized = True
+        except Exception:
+            pass
+
     # Create DB tables + migrate existing ones + seed defaults
+    # Wrapped in try/except so the app still boots on Vercel even if
+    # the DB is temporarily unreachable (the tables will be created on
+    # the first successful request instead).
     with app.app_context():
-        db.create_all()
-        _migrate_db(db)
-        _seed_score_config(db)
+        try:
+            db.create_all()
+            _migrate_db(db)
+            _fix_null_booleans(db)
+            _seed_score_config(db)
+            _db_initialized = True
+        except Exception as e:
+            import sys
+            print(f"[SwimRank] DB init warning: {e}", file=sys.stderr)
 
     return app
 

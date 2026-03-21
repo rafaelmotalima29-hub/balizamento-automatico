@@ -28,7 +28,7 @@ def resultados():
     # Load all results with students/events
     results = (
         Result.query
-        .filter(Result.is_dq == False, Result.total_time.isnot(None))
+        .filter(Result.is_dq.is_(False), Result.total_time.isnot(None))
         .join(Student)
         .join(Event)
         .order_by(Result.total_time.asc())
@@ -249,7 +249,7 @@ def export_xlsx():
     # ── Load data ────────────────────────────────────────────────────
     results = (
         Result.query
-        .filter(Result.is_dq == False, Result.total_time.isnot(None))
+        .filter(Result.is_dq.is_(False), Result.total_time.isnot(None))
         .join(Student)
         .join(Event)
         .order_by(Result.total_time.asc())

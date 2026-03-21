@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from extensions import db
 
 
@@ -24,7 +24,7 @@ class Student(db.Model):
     registration = db.Column(db.String(50), nullable=False, unique=True)
     school_year = db.Column(db.String(50), nullable=False)
     classroom = db.Column(db.String(20), nullable=True)  # Sala (ex: 6A, 7B)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     results = db.relationship("Result", backref="student", lazy=True, cascade="all, delete-orphan")
 
@@ -41,7 +41,7 @@ class Event(db.Model):
     competition_group = db.Column(db.String(50), nullable=True)  # ex: "6º e 7º Ano"
     num_series = db.Column(db.Integer, nullable=False, default=1)   # number of heats/bateries
     athletes_per_series = db.Column(db.Integer, nullable=False, default=8)  # lanes per heat
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     results = db.relationship("Result", backref="event", lazy=True, cascade="all, delete-orphan")
 
@@ -64,9 +64,9 @@ class Result(db.Model):
 
     placement = db.Column(db.Integer, nullable=True)
     points = db.Column(db.Integer, nullable=False, default=0)
-    is_dq = db.Column(db.Boolean, default=False)
+    is_dq = db.Column(db.Boolean, nullable=False, default=False)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Unique per student × event × heat
     __table_args__ = (
