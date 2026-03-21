@@ -7,121 +7,152 @@
 {% block topbar_actions %}
 {% if has_data %}
 <a href="{{ url_for('balizamento.export_xlsx') }}" class="btn btn-primary">
-    📊 Exportar Excel
+    📊 Exportar Tudo
 </a>
 {% endif %}
 {% endblock %}
 
 {% block content %}
 
-<!-- Export Hero -->
-<div class="export-hero">
-    <span class="export-hero-icon">📊</span>
-    <h2>Planilha de Balizamento</h2>
-    <p>
-        Baixe a planilha com os alunos distribuídos em séries e raias por grupo de competição.
-        Preencha os tempos e faça o upload.
-    </p>
-    {% if has_data %}
-    <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-        <a href="{{ url_for('balizamento.export_xlsx') }}" class="btn btn-primary btn-lg">
-            📊 Baixar Excel (.xlsx)
-        </a>
-    </div>
-    <p style="font-size: 12px; color: var(--text-muted); margin-top: 12px;">
-        💡 A planilha terá uma <strong style="color: var(--text-secondary);">aba por grupo de competição</strong>,
-        com os alunos já distribuídos nas séries e raias.
-    </p>
-    {% else %}
-    <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; opacity: 0.5;">
-        <div class="btn btn-primary btn-lg" style="cursor: default;">📊 Baixar Excel (.xlsx)</div>
-    </div>
-    <p style="color: var(--warning); font-size: 13px; margin-top: 12px;">
-        ⚠️ Cadastre ao menos 1 aluno e 1 prova para habilitar a exportação.
-    </p>
-    {% endif %}
-</div>
-
-<!-- Instructions -->
-<div class="card" style="margin-bottom: 24px;">
-    <div class="card-title" style="margin-bottom: 16px;">📋 Como usar</div>
-    <ol
-        style="display: flex; flex-direction: column; gap: 10px; padding-left: 20px; color: var(--text-secondary); font-size: 14px;">
-        <li>Clique em <strong style="color: var(--accent);">Baixar Excel</strong> — a planilha virá com abas por grupo e
-            alunos distribuídos nas séries/raias.</li>
-        <li>Abra no Excel/Google Sheets e preencha <strong>Minutos</strong>, <strong>Segundos</strong> e
-            <strong>Centésimos</strong> para cada raia.
-        </li>
-        <li>Para aluno <strong>desclassificado ou ausente</strong>, preencha: <code
-                style="background: var(--bg-input); padding: 2px 6px; border-radius: 4px;">9</code> / <code
-                style="background: var(--bg-input); padding: 2px 6px; border-radius: 4px;">99</code> / <code
-                style="background: var(--bg-input); padding: 2px 6px; border-radius: 4px;">99</code>.</li>
-        <li>Salve e vá em <a href="{{ url_for('upload.upload') }}">Upload de Resultados</a> para processar.</li>
-    </ol>
-</div>
-
-<!-- Preview by group -->
-{% if has_data and preview %}
-
-{% for group_name, event_series_list in preview.items() %}
-<div class="card" style="padding: 0; overflow: hidden; margin-bottom: 24px;">
-    <div class="card-header" style="padding: 18px 20px;">
-        <div class="card-title">🏊 {{ group_name }}</div>
-        <span style="font-size: 13px; color: var(--text-muted);">{{ event_series_list | length }} prova(s)</span>
-    </div>
-
-    {% for event, series_list in event_series_list %}
-    <div style="padding: 14px 20px 0; border-top: 1px solid var(--border);">
-        <div style="font-size: 13px; font-weight: 600; color: var(--accent); margin-bottom: 10px;">
-            🏁 {{ event.name }} — {{ event.num_series }} série(s) × {{ event.athletes_per_series }} raias
-        </div>
-        <div class="table-wrapper" style="border: none; border-radius: 0; margin-bottom: 14px;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Série</th>
-                        <th>Raia</th>
-                        <th>Atleta</th>
-                        <th>Matrícula</th>
-                        <th>Ano</th>
-                        <th>Sala</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for serie in series_list %}
-                    {% set serie_num = loop.index %}
-                    {% for student in serie %}
-                    <tr>
-                        <td style="color:var(--text-muted); text-align:center;">{{ serie_num }}</td>
-                        <td style="color:var(--text-muted); text-align:center;">{{ loop.index }}</td>
-                        {% if student %}
-                        <td>{{ student.full_name }}</td>
-                        <td style="color:var(--text-muted);">{{ student.registration }}</td>
-                        <td><span class="badge badge-accent" style="font-size:11px;">{{ student.school_year }}</span>
-                        </td>
-                        <td style="color:var(--text-muted);">{{ student.classroom or '—' }}</td>
-                        {% else %}
-                        <td style="color:var(--text-muted); font-style:italic;" colspan="4">— vaga livre —</td>
-                        {% endif %}
-                    </tr>
-                    {% endfor %}
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% endfor %}
-
-{% elif not has_data %}
-<div class="empty-state">
+{% if not has_data %}
+<!-- ── Empty state ── -->
+<div class="empty-state" style="margin-top: 40px;">
     <span class="empty-state-icon">📭</span>
     <h3>Sem dados para exportar</h3>
     <p>Cadastre alunos e provas primeiro para gerar a planilha de balizamento.</p>
     <br />
     <a href="{{ url_for('cadastros.cadastros') }}" class="btn btn-primary">Ir para Cadastros</a>
 </div>
+
+{% else %}
+
+<!-- ── Group filter pills ─────────────────────────────────────────── -->
+<div class="bal-filter-bar">
+    <div class="filter-pills" id="group-filter-pills">
+        <button class="filter-pill active" onclick="setBalizGroup('all', this)">
+            🌐 Todos os grupos
+        </button>
+        {% for group in competition_groups %}
+        {% if group in preview %}
+        <button class="filter-pill" onclick="setBalizGroup('{{ group }}', this)"
+                data-group="{{ group }}">
+            {{ group }}
+            <span class="count-pill" style="margin-left:4px;">
+                {{ group_stats[group].events }} prova(s)
+            </span>
+        </button>
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+
+<!-- ── Per-group sections ─────────────────────────────────────────── -->
+{% for group_name, event_series_list in preview.items() %}
+<div class="bal-group-section" data-group="{{ group_name }}" id="bal-group-{{ loop.index }}">
+
+    <!-- Group header card -->
+    <div class="bal-group-header">
+        <div class="bal-group-title">
+            <span class="bal-group-icon">🏊</span>
+            <div>
+                <div style="font-size:16px; font-weight:800;">{{ group_name }}</div>
+                <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+                    {{ group_stats.get(group_name, {}).get('students', 0) }} aluno(s) ·
+                    {{ event_series_list | length }} prova(s)
+                </div>
+            </div>
+        </div>
+        <a href="{{ url_for('balizamento.export_xlsx', group=group_name) }}"
+           class="btn btn-outline btn-sm">
+            📊 Exportar {{ group_name }}
+        </a>
+    </div>
+
+    <!-- Events for this group -->
+    {% for event, series_list in event_series_list %}
+    <div class="bal-event-block">
+        <div class="bal-event-title">
+            🏁 {{ event.name }}
+            <span style="font-weight:400; color:var(--text-muted); font-size:12px; margin-left:8px;">
+                {{ event.num_series }} série(s) × {{ event.athletes_per_series }} raias
+                · {{ series_list | sum(attribute='__len__') | default(0) }} vagas
+            </span>
+        </div>
+
+        <!-- Series previewed as stacked blocks -->
+        {% for serie in series_list %}
+        {% set serie_num = loop.index %}
+        <div class="bal-serie-block">
+            <div class="bal-serie-label">Série {{ serie_num }} de {{ series_list | length }}</div>
+            <div class="table-wrapper" style="border:none; border-radius:0;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:50px;">Raia</th>
+                            <th>Atleta</th>
+                            <th>Matrícula</th>
+                            <th>Ano</th>
+                            <th>Sala</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student in serie %}
+                        <tr>
+                            <td style="text-align:center; color:var(--text-muted);">{{ loop.index }}</td>
+                            {% if student %}
+                            <td><strong>{{ student.full_name }}</strong></td>
+                            <td style="color:var(--text-muted);">{{ student.registration }}</td>
+                            <td><span class="badge badge-accent" style="font-size:11px;">{{ student.school_year }}</span></td>
+                            <td style="color:var(--text-muted);">{{ student.classroom or '—' }}</td>
+                            {% else %}
+                            <td style="color:var(--text-muted); font-style:italic;" colspan="4">— vaga livre —</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+
+    </div>
+    {% endfor %}
+
+</div>
+{% endfor %}
+
+<!-- ── Instructions card ─────────────────────────────────────────── -->
+<div class="card bal-instructions">
+    <div class="card-title" style="margin-bottom:16px;">📋 Como usar</div>
+    <ol style="display:flex; flex-direction:column; gap:10px; padding-left:20px; color:var(--text-secondary); font-size:14px;">
+        <li>Filtre por grupo (opcional) e clique em <strong style="color:var(--accent);">Exportar</strong>.</li>
+        <li>Abra no Excel/Google Sheets e preencha <strong>Minutos</strong>, <strong>Segundos</strong> e <strong>Centésimos</strong> para cada raia.</li>
+        <li>Para aluno <strong>desclassificado ou ausente</strong>, use:
+            <code style="background:var(--bg-input); padding:2px 6px; border-radius:4px;">9</code> /
+            <code style="background:var(--bg-input); padding:2px 6px; border-radius:4px;">99</code> /
+            <code style="background:var(--bg-input); padding:2px 6px; border-radius:4px;">99</code>.
+        </li>
+        <li>Salve e vá em <a href="{{ url_for('upload.upload') }}">Upload de Resultados</a> para processar o ranking.</li>
+    </ol>
+</div>
+
 {% endif %}
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function setBalizGroup(group, btn) {
+    document.querySelectorAll('#group-filter-pills .filter-pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+
+    document.querySelectorAll('.bal-group-section').forEach(section => {
+        if (group === 'all' || section.dataset.group === group) {
+            section.style.display = '';
+        } else {
+            section.style.display = 'none';
+        }
+    });
+}
+</script>
 {% endblock %}
