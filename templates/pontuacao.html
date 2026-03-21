@@ -282,8 +282,15 @@
     });
 
     tbody.querySelectorAll(".btn-delete").forEach(btn => {
-      btn.addEventListener("click", e => {
+      btn.addEventListener("click", async e => {
         const placement = parseInt(btn.dataset.placement);
+        const confirmed = await showConfirm(
+          `Remover ${placement}º lugar?`,
+          `A colocação <strong>${placement}º lugar</strong> será removida. Alunos nessa posição receberão <strong>0 pontos</strong>.`,
+          "Remover",
+          "🗑️"
+        );
+        if (!confirmed) return;
         rows = rows.filter(r => r.placement !== placement);
         reRender();
       });

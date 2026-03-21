@@ -5,7 +5,13 @@
 {% block page_subtitle %}Visualização detalhada da competição{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('upload.upload') }}" class="btn btn-outline">⬆️ Novo Upload</a>
+<div style="display:flex; gap:8px; flex-wrap:wrap;">
+    {% if has_results %}
+    <a href="{{ url_for('resultados.export_xlsx') }}" class="btn btn-primary btn-sm">📊 Exportar XLSX</a>
+    {% endif %}
+    <button class="btn btn-ghost btn-sm" onclick="window.print()" title="Imprimir resultados">🖨️ Imprimir</button>
+    <a href="{{ url_for('upload.upload') }}" class="btn btn-outline">⬆️ Novo Upload</a>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -113,6 +119,7 @@
                         <th>Atleta</th>
                         <th>Ano / Equipe</th>
                         <th>Sala</th>
+                        <th>Prova</th>
                         <th>Tempo</th>
                     </tr>
                 </thead>
@@ -131,6 +138,7 @@
                         <td><span class="badge badge-accent" style="font-size:11px;">{{ entry.result.student.school_year
                                 }}</span></td>
                         <td style="color:var(--text-muted);">{{ entry.result.student.classroom or '—' }}</td>
+                        <td style="color:var(--text-muted); font-size:12px;">{{ entry.result.event.name }}</td>
                         <td style="font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent);">
                             {{ m }}:{{ '%02d' | format(s) }}.{{ '%02d' | format(c) }}
                         </td>

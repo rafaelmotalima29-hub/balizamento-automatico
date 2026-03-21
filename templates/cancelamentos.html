@@ -91,8 +91,8 @@
     <div class="info-note" style="margin-top: 16px;">
         <span style="font-size: 18px; flex-shrink: 0;">💡</span>
         <div>
-            Marcar <strong style="color: var(--danger);">DQ / Ausente</strong> salva imediatamente no banco de dados.
-            O ranking de pontos é recalculado na próxima vez que você fizer upload dos resultados.
+            Marcar <strong style="color: var(--danger);">DQ / Ausente</strong> salva imediatamente e apaga o tempo do aluno.
+            Para restaurar um aluno reativado com seu tempo original, faça um novo upload dos resultados.
         </div>
     </div>
 </div>
@@ -282,6 +282,20 @@ function renderCards(students, eventId) {
 }
 
 async function toggleDQ(studentId, eventId, btn) {
+    const student = allStudents.find(s => s.id === studentId);
+    const isDQ = student?.result?.is_dq;
+
+    // Pede confirmação apenas ao marcar DQ (não ao reativar)
+    if (!isDQ) {
+        const confirmed = await showConfirm(
+            'Marcar como DQ / Ausente?',
+            `<strong>${escHtml(student?.full_name || 'Este aluno')}</strong> será marcado como desclassificado ou ausente nesta prova. O tempo registrado será apagado.`,
+            'Marcar DQ',
+            '🚫'
+        );
+        if (!confirmed) return;
+    }
+
     btn.disabled = true;
     btn.textContent = '⏳';
 

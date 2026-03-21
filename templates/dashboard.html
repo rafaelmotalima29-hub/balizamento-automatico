@@ -13,7 +13,7 @@
 {% block content %}
 
 <!-- ── Stat Cards ──────────────────────────────────────────────────── -->
-<div class="grid-3" style="margin-bottom: 32px;">
+<div class="grid-3 stat-grid" style="margin-bottom: 32px;">
     <div class="stat-card">
         <span class="stat-icon">🏊‍♂️</span>
         <div class="stat-info">
@@ -48,9 +48,24 @@
 <div class="empty-state">
     <span class="empty-state-icon">📭</span>
     <h3>Nenhum resultado ainda</h3>
-    <p>Faça o upload de uma planilha de resultados para visualizar o ranking das equipes.</p>
-    <br />
-    <a href="{{ url_for('upload.upload') }}" class="btn btn-primary">Fazer Upload</a>
+    <p>Siga o fluxo abaixo para processar os resultados da competição:</p>
+</div>
+<div class="grid-3" style="margin-top: 20px; margin-bottom: 40px;">
+    <a href="{{ url_for('cadastros.cadastros') }}" class="card" style="text-decoration:none; text-align:center; padding:24px; transition: border-color var(--transition); cursor:pointer;">
+        <div style="font-size:36px; margin-bottom:12px;">📝</div>
+        <div style="font-size:14px; font-weight:700; margin-bottom:6px; color:var(--text-primary);">1. Cadastros</div>
+        <div style="font-size:12px; color:var(--text-muted); line-height:1.5;">Registre os alunos e as provas do evento</div>
+    </a>
+    <a href="{{ url_for('balizamento.balizamento') }}" class="card" style="text-decoration:none; text-align:center; padding:24px; transition: border-color var(--transition); cursor:pointer;">
+        <div style="font-size:36px; margin-bottom:12px;">📤</div>
+        <div style="font-size:14px; font-weight:700; margin-bottom:6px; color:var(--text-primary);">2. Balizamento</div>
+        <div style="font-size:12px; color:var(--text-muted); line-height:1.5;">Exporte a planilha e preencha os tempos</div>
+    </a>
+    <a href="{{ url_for('upload.upload') }}" class="card" style="text-decoration:none; text-align:center; padding:24px; transition: border-color var(--transition); cursor:pointer;">
+        <div style="font-size:36px; margin-bottom:12px;">⬆️</div>
+        <div style="font-size:14px; font-weight:700; margin-bottom:6px; color:var(--text-primary);">3. Upload</div>
+        <div style="font-size:12px; color:var(--text-muted); line-height:1.5;">Envie a planilha preenchida para calcular o ranking</div>
+    </a>
 </div>
 {% else %}
 <div class="ranking-list" style="margin-bottom: 40px;">
@@ -70,10 +85,21 @@
 </div>
 
 <!-- ── Results by Event ──────────────────────────────────────────── -->
-<div class="section-title">📋 Resultados por Prova</div>
+<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+    <div class="section-title" style="margin-bottom:0;">📋 Resultados por Prova</div>
+    <div class="accordion-actions" style="display:flex; gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="expandAllPanels()">
+            ⬇ Expandir tudo
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="collapseAllPanels()">
+            ⬆ Colapsar tudo
+        </button>
+    </div>
+</div>
 
 <div class="event-accordion">
     {% for event, by_corrida in event_results.items() %}
+    {% if by_corrida %}
     <div class="event-panel" id="panel-{{ event.id }}">
         <div class="event-panel-header" onclick="togglePanel('panel-{{ event.id }}')">
             <div class="event-panel-title">
@@ -155,6 +181,7 @@
             {% endfor %}
         </div>
     </div>
+    {% endif %}
     {% endfor %}
 </div>
 {% endif %}

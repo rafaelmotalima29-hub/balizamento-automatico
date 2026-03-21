@@ -36,6 +36,14 @@ function togglePanel(panelId) {
     document.getElementById(panelId)?.classList.toggle("open");
 }
 
+function expandAllPanels() {
+    document.querySelectorAll(".event-panel").forEach(p => p.classList.add("open"));
+}
+
+function collapseAllPanels() {
+    document.querySelectorAll(".event-panel").forEach(p => p.classList.remove("open"));
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const firstPanel = document.querySelector(".event-panel");
     firstPanel?.classList.add("open");
@@ -79,8 +87,10 @@ dropZone?.addEventListener("drop", (e) => {
 document.getElementById("upload-form")?.addEventListener("submit", () => {
     if (uploadBtn) {
         uploadBtn.disabled = true;
-        uploadBtn.textContent = "⏳ Processando…";
+        uploadBtn.innerHTML = "⏳ Processando…";
     }
+    const progress = document.getElementById("upload-progress");
+    if (progress) progress.style.display = "block";
 });
 
 // ── Flash auto-dismiss ───────────────────────────────────────────────

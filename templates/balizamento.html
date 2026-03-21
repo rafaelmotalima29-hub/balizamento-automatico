@@ -6,9 +6,9 @@
 
 {% block topbar_actions %}
 {% if has_data %}
-<a href="{{ url_for('balizamento.export_xlsx') }}" class="btn btn-primary">
-    📊 Exportar Tudo
-</a>
+<button class="btn btn-primary" id="btn-export-selected" onclick="exportSelectedGroups()">
+    📊 Exportar Selecionados
+</button>
 {% endif %}
 {% endblock %}
 
@@ -26,21 +26,28 @@
 
 {% else %}
 
-<!-- ── Group filter pills ─────────────────────────────────────────── -->
+<!-- ── Group selection checkboxes ──────────────────────────────────── -->
 <div class="bal-filter-bar">
-    <div class="filter-pills" id="group-filter-pills">
-        <button class="filter-pill active" onclick="setBalizGroup('all', this)">
-            🌐 Todos os grupos
-        </button>
+    <div class="bal-group-checkboxes" id="group-checkboxes">
+        <label class="bal-group-check-label" style="font-weight:700; color:var(--text-muted); margin-right:8px;">
+            Selecione os grupos:
+        </label>
+        <label class="bal-check-pill">
+            <input type="checkbox" id="check-all-groups" onchange="toggleAllGroups(this)" checked />
+            <span class="bal-check-pill-text">🌐 Todos</span>
+        </label>
         {% for group in competition_groups %}
         {% if group in preview %}
-        <button class="filter-pill" onclick="setBalizGroup('{{ group }}', this)"
-                data-group="{{ group }}">
-            {{ group }}
-            <span class="count-pill" style="margin-left:4px;">
-                {{ group_stats[group].events }} prova(s)
+        <label class="bal-check-pill">
+            <input type="checkbox" class="group-checkbox" value="{{ group }}"
+                   data-group="{{ group }}" onchange="onGroupCheckChange()" checked />
+            <span class="bal-check-pill-text">
+                {{ group }}
+                <span class="count-pill" style="margin-left:4px;">
+                    {{ group_stats[group].events }} prova(s)
+                </span>
             </span>
-        </button>
+        </label>
         {% endif %}
         {% endfor %}
     </div>
@@ -62,10 +69,9 @@
                 </div>
             </div>
         </div>
-        <a href="{{ url_for('balizamento.export_xlsx', group=group_name) }}"
-           class="btn btn-outline btn-sm">
-            📊 Exportar {{ group_name }}
-        </a>
+        <span class="badge badge-accent" style="font-size:12px;">
+            {{ group_name }}
+        </span>
     </div>
 
     <!-- Events for this group -->
@@ -142,17 +148,55 @@
 
 {% block extra_js %}
 <script>
-function setBalizGroup(group, btn) {
-    document.querySelectorAll('#group-filter-pills .filter-pill').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
+function getSelectedGroups() {
+    return Array.from(document.querySelectorAll('.group-checkbox:checked')).map(cb => cb.value);
+}
 
+function toggleAllGroups(allCb) {
+    const checked = allCb.checked;
+    document.querySelectorAll('.group-checkbox').forEach(cb => { cb.checked = checked; });
+    updateGroupVisibility();
+    updateExportButton();
+}
+
+function onGroupCheckChange() {
+    const allBoxes = document.querySelectorAll('.group-checkbox');
+    const allChecked = Array.from(allBoxes).every(cb => cb.checked);
+    document.getElementById('check-all-groups').checked = allChecked;
+    updateGroupVisibility();
+    updateExportButton();
+}
+
+function updateGroupVisibility() {
+    const selected = getSelectedGroups();
     document.querySelectorAll('.bal-group-section').forEach(section => {
-        if (group === 'all' || section.dataset.group === group) {
-            section.style.display = '';
-        } else {
-            section.style.display = 'none';
-        }
+        section.style.display = selected.includes(section.dataset.group) ? '' : 'none';
     });
 }
+
+function updateExportButton() {
+    const btn = document.getElementById('btn-export-selected');
+    const count = getSelectedGroups().length;
+    if (count === 0) {
+        btn.disabled = true;
+        btn.textContent = '📊 Nenhum grupo selecionado';
+    } else {
+        btn.disabled = false;
+        btn.textContent = '📊 Exportar ' + count + ' grupo(s)';
+    }
+}
+
+function exportSelectedGroups() {
+    const groups = getSelectedGroups();
+    if (groups.length === 0) return;
+    const params = new URLSearchParams();
+    groups.forEach(g => params.append('groups', g));
+    window.location.href = '{{ url_for("balizamento.export_xlsx") }}?' + params.toString();
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', function() {
+    updateExportButton();
+});
 </script>
 {% endblock %}

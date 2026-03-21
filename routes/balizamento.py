@@ -74,8 +74,9 @@ def export_xlsx():
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
-    selected_group = request.args.get("group")  # optional filter by group
-    selected_events = request.args.get("events")  # optional comma-sep event IDs
+    selected_groups = request.args.getlist("groups")  # multi-group selection
+    selected_group  = request.args.get("group")       # legacy single-group
+    selected_events = request.args.get("events")      # optional comma-sep event IDs
 
     students = Student.query.order_by(Student.school_year, Student.full_name).all()
     events   = Event.query.order_by(Event.name).all()
@@ -87,6 +88,8 @@ def export_xlsx():
             events = [e for e in events if e.id in ev_ids]
         except ValueError:
             pass
+    elif selected_groups:
+        events = [e for e in events if e.competition_group in selected_groups]
     elif selected_group:
         events = [e for e in events if e.competition_group == selected_group]
 
@@ -222,7 +225,10 @@ def export_xlsx():
     buf.seek(0)
 
     # Build a descriptive filename
-    if selected_group:
+    if selected_groups and len(selected_groups) == 1:
+        safe_name = selected_groups[0].replace(" ", "_").replace("º", "").replace("°", "")
+        filename  = f"balizamento_{safe_name}.xlsx"
+    elif selected_group:
         safe_name = selected_group.replace(" ", "_").replace("º", "").replace("°", "")
         filename  = f"balizamento_{safe_name}.xlsx"
     else:
