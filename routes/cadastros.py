@@ -32,7 +32,11 @@ def cadastros():
     # Events per group
     group_event_counts = defaultdict(int)
     for e in events:
-        group_event_counts[e.competition_group or "Sem Grupo"] += 1
+        if e.competition_group:
+            for g in e.competition_group.split(","):
+                group_event_counts[g.strip()] += 1
+        else:
+            group_event_counts["Sem Grupo"] += 1
 
     return render_template(
         "cadastros.html",
@@ -126,7 +130,8 @@ def delete_student(student_id):
 @cadastros_bp.route("/cadastros/prova", methods=["POST"])
 def add_event():
     name              = request.form.get("name", "").strip()
-    competition_group = request.form.get("competition_group", "").strip() or None
+    groups = request.form.getlist("competition_group")
+    competition_group = ",".join(g.strip() for g in groups if g.strip()) or None
     try:
         num_corridas = max(1, min(10, int(request.form.get("num_corridas", 1))))
     except (ValueError, TypeError):

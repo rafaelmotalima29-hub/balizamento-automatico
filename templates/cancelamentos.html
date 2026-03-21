@@ -27,7 +27,7 @@
             <option value="">Escolha uma prova para gerenciar...</option>
             {% for group in competition_groups %}
             {% set group_events = [] %}
-            {% for e in events %}{% if e.competition_group == group %}{% set _ = group_events.append(e) %}{% endif %}{% endfor %}
+            {% for e in events %}{% if e.competition_group and group in e.competition_group %}{% set _ = group_events.append(e) %}{% endif %}{% endfor %}
             {% if group_events %}
             <optgroup label="{{ group }}">
                 {% for e in group_events %}

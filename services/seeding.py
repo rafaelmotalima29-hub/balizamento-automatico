@@ -48,6 +48,7 @@ def _normalize(s: str) -> str:
 def build_series(
     event,
     students: list[Student],
+    event_group: Optional[str] = None
 ) -> list[list[Optional[Student]]]:
     """
     Distribute students across event.num_series heats, each with
@@ -57,7 +58,7 @@ def build_series(
     """
     num_series = max(1, event.num_series or 1)
     athletes_per_series = max(1, event.athletes_per_series or 8)
-    group = event.competition_group or ""
+    group = event_group if event_group is not None else (event.competition_group or "")
 
     # Bucket students by year (preserving insertion order)
     from collections import defaultdict

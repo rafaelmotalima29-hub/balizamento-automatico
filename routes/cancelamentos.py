@@ -28,7 +28,10 @@ def event_students(event_id):
     event = Event.query.get_or_404(event_id)
     group = event.competition_group or ""
 
-    years = GROUP_TO_YEARS.get(group, [])
+    years = []
+    if group:
+        for g in group.split(","):
+            years.extend(GROUP_TO_YEARS.get(g.strip(), []))
     if years:
         students = (
             Student.query

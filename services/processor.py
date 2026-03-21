@@ -345,7 +345,7 @@ def _event_for_student(student):
     from services.seeding import YEAR_TO_GROUP
     student_group = YEAR_TO_GROUP.get(student.school_year)
     for event in Event.query.all():
-        if event.competition_group == student_group:
+        if event.competition_group and student_group in [g.strip() for g in event.competition_group.split(",")]:
             return event
     return None
 

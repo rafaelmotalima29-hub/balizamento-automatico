@@ -53,7 +53,7 @@ def balizamento():
         years = _years_for_group(group)
         group_stats[group] = {
             "students": len([s for s in students if s.school_year in years]),
-            "events":   len([e for e in events if e.competition_group == group]),
+            "events":   len([e for e in events if e.competition_group and group in [x.strip() for x in e.competition_group.split(",")] ]),
         }
 
     return render_template(
@@ -89,17 +89,24 @@ def export_xlsx():
         except ValueError:
             pass
     elif selected_groups:
-        events = [e for e in events if e.competition_group in selected_groups]
+        events = [e for e in events if e.competition_group and any(g.strip() in selected_groups for g in e.competition_group.split(","))]
     elif selected_group:
-        events = [e for e in events if e.competition_group == selected_group]
+        events = [e for e in events if e.competition_group and selected_group in [g.strip() for g in e.competition_group.split(",")]]
 
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
 
     grouped = defaultdict(list)
     for ev in events:
-        key = ev.competition_group or "Sem Grupo"
-        grouped[key].append(ev)
+        if ev.competition_group:
+            for g in ev.competition_group.split(","):
+                g = g.strip()
+                if selected_groups and g not in selected_groups: continue
+                if selected_group and g != selected_group: continue
+                grouped[g].append(ev)
+        else:
+            if not selected_groups and not selected_group:
+                grouped["Sem Grupo"].append(ev)
 
     sheet_order = [g for g in COMPETITION_GROUPS if g in grouped]
     if "Sem Grupo" in grouped:
@@ -248,11 +255,19 @@ def _build_preview(events, students):
     """Return {group: [(event, series_list)]} for template preview."""
     grouped = defaultdict(list)
     for ev in events:
-        key = ev.competition_group or "Sem Grupo"
-        group_years    = _years_for_group(key)
-        group_students = [s for s in students if s.school_year in group_years] if group_years else students
-        series_list    = build_series(ev, group_students)
-        grouped[key].append((ev, series_list))
+        if ev.competition_group:
+            for g in ev.competition_group.split(","):
+                key = g.strip()
+                group_years    = _years_for_group(key)
+                group_students = [s for s in students if s.school_year in group_years] if group_years else students
+                series_list    = build_series(ev, group_students)
+                grouped[key].append((ev, series_list))
+        else:
+            key = "Sem Grupo"
+            group_years = _years_for_group(key)
+            group_students = [s for s in students if s.school_year in group_years] if group_years else students
+            series_list = build_series(ev, group_students)
+            grouped[key].append((ev, series_list))
     return dict(grouped)
 
 

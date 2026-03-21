@@ -213,13 +213,15 @@
                            placeholder="ex: 50m Livre, 4x25m Misto" required />
                 </div>
                 <div class="form-group">
-                    <label for="competition_group">Grupo de Competição</label>
-                    <select id="competition_group" name="competition_group" required>
-                        <option value="" disabled selected>Selecione...</option>
+                    <label>Grupos de Competição</label>
+                    <div style="display:flex; flex-direction:column; gap:8px; padding:12px; background:var(--bg-card); border:1px solid var(--border); border-radius:8px;">
                         {% for group in competition_groups %}
-                        <option value="{{ group }}">{{ group }}</option>
+                        <label style="display:flex; align-items:center; gap:8px; font-weight:normal; cursor:pointer; margin:0;">
+                            <input type="checkbox" name="competition_group" value="{{ group }}" style="width:16px; height:16px;">
+                            {{ group }}
+                        </label>
                         {% endfor %}
-                    </select>
+                    </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
@@ -400,13 +402,15 @@
             <input type="text" id="edit-event-name" placeholder="ex: 50m Livre" autocomplete="off" />
         </div>
         <div class="form-group">
-            <label for="edit-event-group">Grupo de Competição</label>
-            <select id="edit-event-group">
-                <option value="">Sem grupo</option>
+            <label>Grupos de Competição</label>
+            <div style="display:flex; flex-direction:column; gap:8px; padding:12px; background:var(--bg-card); border:1px solid var(--border); border-radius:8px;">
                 {% for group in competition_groups %}
-                <option value="{{ group }}">{{ group }}</option>
+                <label style="display:flex; align-items:center; gap:8px; font-weight:normal; cursor:pointer; margin:0;">
+                    <input type="checkbox" value="{{ group }}" class="edit-group-cb" style="width:16px; height:16px;">
+                    {{ group }}
+                </label>
                 {% endfor %}
-            </select>
+            </div>
         </div>
         <div class="form-row">
             <div class="form-group">
@@ -556,7 +560,10 @@ async function submitEditStudent() {
 function openEditEvent(id, name, group, numSeries, lanes) {
     document.getElementById('edit-event-id').value      = id;
     document.getElementById('edit-event-name').value    = name;
-    document.getElementById('edit-event-group').value   = group;
+    const currentGroups = group ? group.split(',').map(g => g.trim()) : [];
+    document.querySelectorAll('.edit-group-cb').forEach(cb => {
+        cb.checked = currentGroups.includes(cb.value);
+    });
     document.getElementById('edit-event-series').value  = numSeries;
     document.getElementById('edit-event-lanes').value   = lanes;
     document.getElementById('edit-event-subtitle').textContent = `${numSeries} série(s) × ${lanes} raias`;
@@ -568,7 +575,7 @@ function openEditEvent(id, name, group, numSeries, lanes) {
 async function submitEditEvent() {
     const id                 = document.getElementById('edit-event-id').value;
     const name               = document.getElementById('edit-event-name').value.trim();
-    const competition_group  = document.getElementById('edit-event-group').value;
+    const competition_group  = Array.from(document.querySelectorAll('.edit-group-cb:checked')).map(cb => cb.value).join(',');
     const num_series         = parseInt(document.getElementById('edit-event-series').value) || 1;
     const athletes_per_series = parseInt(document.getElementById('edit-event-lanes').value) || 8;
     const errEl              = document.getElementById('edit-event-error');

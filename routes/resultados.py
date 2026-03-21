@@ -37,10 +37,18 @@ def resultados():
 
     # Build per-group data
     # {competition_group: [result, ...]}
+    from services.seeding import YEAR_TO_GROUP
     by_group: dict[str, list] = defaultdict(list)
     for r in results:
-        group = r.event.competition_group or "Sem Grupo"
-        by_group[group].append(r)
+        if r.event.competition_group:
+            event_groups = [g.strip() for g in r.event.competition_group.split(",")]
+            stu_group = YEAR_TO_GROUP.get(r.student.school_year)
+            if stu_group in event_groups:
+                by_group[stu_group].append(r)
+            else:
+                by_group[event_groups[0]].append(r)
+        else:
+            by_group["Sem Grupo"].append(r)
 
     # Order groups
     from services.seeding import COMPETITION_GROUPS
@@ -263,8 +271,15 @@ def export_xlsx():
     # ── Build ranking data (same logic as the view) ──────────────────
     by_group = defaultdict(list)
     for r in results:
-        group = r.event.competition_group or "Sem Grupo"
-        by_group[group].append(r)
+        if r.event.competition_group:
+            event_groups = [g.strip() for g in r.event.competition_group.split(",")]
+            stu_group = YEAR_TO_GROUP.get(r.student.school_year)
+            if stu_group in event_groups:
+                by_group[stu_group].append(r)
+            else:
+                by_group[event_groups[0]].append(r)
+        else:
+            by_group["Sem Grupo"].append(r)
 
     group_order = [g for g in COMPETITION_GROUPS if g in by_group]
     if "Sem Grupo" in by_group and "Sem Grupo" not in group_order:
