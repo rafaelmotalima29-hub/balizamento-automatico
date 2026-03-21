@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
+from flask_login import login_required
 from extensions import db
 from models import ScoreConfig
 
@@ -6,12 +7,14 @@ pontuacao_bp = Blueprint("pontuacao", __name__)
 
 
 @pontuacao_bp.route("/pontuacao")
+@login_required
 def pontuacao():
     rows = ScoreConfig.query.order_by(ScoreConfig.placement).all()
     return render_template("pontuacao.html", rows=rows)
 
 
 @pontuacao_bp.route("/pontuacao/save", methods=["POST"])
+@login_required
 def save():
     """
     Recebe JSON: [ {"placement": 1, "points": 10}, … ]
@@ -51,6 +54,7 @@ def save():
 
 
 @pontuacao_bp.route("/pontuacao/reset", methods=["POST"])
+@login_required
 def reset():
     """Restaura a pontuação padrão."""
     defaults = {1: 10, 2: 8, 3: 7, 4: 6, 5: 5, 6: 4, 7: 3, 8: 2, 9: 1}

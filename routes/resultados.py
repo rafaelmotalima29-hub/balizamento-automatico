@@ -11,6 +11,7 @@ Groups results by competition_group and provides:
 import io
 from collections import defaultdict
 from flask import Blueprint, render_template, send_file
+from flask_login import login_required
 
 from models import Student, Event, Result, ScoreConfig
 from extensions import db
@@ -20,6 +21,7 @@ resultados_bp = Blueprint("resultados", __name__)
 
 
 @resultados_bp.route("/resultados")
+@login_required
 def resultados():
     has_results = Result.query.count() > 0
     if not has_results:
@@ -134,6 +136,7 @@ def _fmt_time(total: float) -> str:
 # ── XLSX Export ──────────────────────────────────────────────────────
 
 @resultados_bp.route("/resultados/export/xlsx")
+@login_required
 def export_xlsx():
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side

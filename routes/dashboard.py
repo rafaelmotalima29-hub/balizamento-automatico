@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template
+from flask_login import login_required
 from sqlalchemy import func
 from models import Student, Result, Event
 from extensions import db
@@ -7,6 +8,7 @@ dashboard_bp = Blueprint("dashboard", __name__)
 
 
 @dashboard_bp.route("/")
+@login_required
 def index():
     # ── Team ranking: sum of points per school_year ──────────────────────────
     team_ranking = (

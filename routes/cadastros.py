@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask_login import login_required
 from extensions import db
 from models import Student, Event
 from services.seeding import COMPETITION_GROUPS, YEAR_TO_GROUP
@@ -13,6 +14,7 @@ for _y, _g in YEAR_TO_GROUP.items():
 
 
 @cadastros_bp.route("/cadastros")
+@login_required
 def cadastros():
     students = Student.query.order_by(Student.school_year, Student.full_name).all()
     events   = Event.query.order_by(Event.name).all()
@@ -52,6 +54,7 @@ def cadastros():
 # ── Student CRUD ─────────────────────────────────────────────────────
 
 @cadastros_bp.route("/cadastros/aluno", methods=["POST"])
+@login_required
 def add_student():
     full_name    = request.form.get("full_name", "").strip()
     registration = request.form.get("registration", "").strip()
@@ -80,6 +83,7 @@ def add_student():
 
 
 @cadastros_bp.route("/cadastros/aluno/<int:student_id>", methods=["PUT"])
+@login_required
 def edit_student(student_id):
     student = Student.query.get_or_404(student_id)
     data    = request.get_json(force=True) or {}
@@ -118,6 +122,7 @@ def edit_student(student_id):
 
 
 @cadastros_bp.route("/cadastros/aluno/<int:student_id>", methods=["DELETE"])
+@login_required
 def delete_student(student_id):
     student = Student.query.get_or_404(student_id)
     db.session.delete(student)
@@ -128,6 +133,7 @@ def delete_student(student_id):
 # ── Event CRUD ────────────────────────────────────────────────────────
 
 @cadastros_bp.route("/cadastros/prova", methods=["POST"])
+@login_required
 def add_event():
     name              = request.form.get("name", "").strip()
     groups = request.form.getlist("competition_group")
@@ -168,6 +174,7 @@ def add_event():
 
 
 @cadastros_bp.route("/cadastros/prova/<int:event_id>", methods=["PUT"])
+@login_required
 def edit_event(event_id):
     event = Event.query.get_or_404(event_id)
     data  = request.get_json(force=True) or {}
@@ -209,6 +216,7 @@ def edit_event(event_id):
 
 
 @cadastros_bp.route("/cadastros/prova/<int:event_id>", methods=["DELETE"])
+@login_required
 def delete_event(event_id):
     event = Event.query.get_or_404(event_id)
     db.session.delete(event)

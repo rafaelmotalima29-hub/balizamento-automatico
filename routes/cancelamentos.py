@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify
+from flask_login import login_required
 from extensions import db
 from models import Student, Event, Result
 from services.seeding import COMPETITION_GROUPS
@@ -14,6 +15,7 @@ GROUP_TO_YEARS = {
 
 
 @cancelamentos_bp.route("/cancelamentos")
+@login_required
 def cancelamentos():
     events = Event.query.order_by(Event.competition_group, Event.name).all()
     return render_template(
@@ -24,6 +26,7 @@ def cancelamentos():
 
 
 @cancelamentos_bp.route("/api/event/<int:event_id>/students")
+@login_required
 def event_students(event_id):
     event = Event.query.get_or_404(event_id)
     group = event.competition_group or ""
@@ -79,6 +82,7 @@ def event_students(event_id):
 
 
 @cancelamentos_bp.route("/api/result/toggle-dq", methods=["POST"])
+@login_required
 def toggle_dq():
     data = request.get_json(force=True) or {}
     student_id = data.get("student_id")

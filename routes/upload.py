@@ -1,5 +1,6 @@
 import os
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask_login import login_required
 from werkzeug.utils import secure_filename
 from services.processor import process_upload
 
@@ -13,11 +14,13 @@ def _allowed_file(filename: str) -> bool:
 
 
 @upload_bp.route("/upload", methods=["GET"])
+@login_required
 def upload():
     return render_template("upload.html")
 
 
 @upload_bp.route("/upload", methods=["POST"])
+@login_required
 def process():
     if "file" not in request.files:
         flash("Nenhum arquivo enviado.", "error")

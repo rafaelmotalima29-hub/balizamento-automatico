@@ -8,6 +8,7 @@ Sheet layout (one row per lane):
 import io
 from collections import defaultdict
 from flask import Blueprint, render_template, send_file, request
+from flask_login import login_required
 from models import Student, Event
 from services.seeding import build_series, COMPETITION_GROUPS, YEAR_TO_GROUP
 
@@ -40,6 +41,7 @@ SERIE_SEP_BG   = "0A1018"
 # ── Route: preview page ───────────────────────────────────────────────
 
 @balizamento_bp.route("/balizamento")
+@login_required
 def balizamento():
     students = Student.query.order_by(Student.school_year, Student.full_name).all()
     events   = Event.query.order_by(Event.name).all()
@@ -70,6 +72,7 @@ def balizamento():
 # ── Route: XLSX export ────────────────────────────────────────────────
 
 @balizamento_bp.route("/balizamento/export/xlsx")
+@login_required
 def export_xlsx():
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side

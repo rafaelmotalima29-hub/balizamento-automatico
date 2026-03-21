@@ -1,6 +1,10 @@
 import os
+from datetime import timedelta
+
 from flask import Flask
+from flask_login import LoginManager
 from sqlalchemy import text
+
 from config import Config
 from extensions import db
 
@@ -91,7 +95,19 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
 
+    # Flask-Login setup
+    login_manager = LoginManager()
+    login_manager.login_view = "auth.login"
+    login_manager.login_message = "Faça login para acessar o sistema."
+    login_manager.login_message_category = "warning"
+    login_manager.init_app(app)
+    app.config["REMEMBER_COOKIE_DURATION"] = timedelta(days=30)
+
+    from routes.auth import load_user
+    login_manager.user_loader(load_user)
+
     # Register blueprints
+    from routes.auth import auth_bp
     from routes.dashboard import dashboard_bp
     from routes.cadastros import cadastros_bp
     from routes.balizamento import balizamento_bp
@@ -100,6 +116,7 @@ def create_app():
     from routes.cancelamentos import cancelamentos_bp
     from routes.pontuacao import pontuacao_bp
 
+    app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(cadastros_bp)
     app.register_blueprint(balizamento_bp)
