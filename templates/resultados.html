@@ -99,6 +99,11 @@
                     style="font-size: 20px; font-weight: 700; color: {{ med_colors[mi] }}; font-variant-numeric: tabular-nums;">
                     {{ m }}:{{ '%02d' | format(s) }}.{{ '%02d' | format(c) }}
                 </div>
+                {% if r.points %}
+                <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-top: 4px;">
+                    {{ r.points }} pts
+                </div>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
@@ -121,6 +126,7 @@
                         <th>Sala</th>
                         <th>Prova</th>
                         <th>Tempo</th>
+                        <th style="width:60px;">Pts</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -141,6 +147,9 @@
                         <td style="color:var(--text-muted); font-size:12px;">{{ entry.result.event.name }}</td>
                         <td style="font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent);">
                             {{ m }}:{{ '%02d' | format(s) }}.{{ '%02d' | format(c) }}
+                        </td>
+                        <td style="text-align:center; font-weight:700; color:var(--text-primary);">
+                            {{ entry.result.points or 0 }}
                         </td>
                     </tr>
                     {% endfor %}
@@ -179,6 +188,7 @@
                             <th>Atleta</th>
                             <th>Sala</th>
                             <th>Tempo</th>
+                            <th style="width:60px;">Pts</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -196,6 +206,9 @@
                             <td style="color:var(--text-muted);">{{ entry.result.student.classroom or '—' }}</td>
                             <td style="font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent);">
                                 {{ m }}:{{ '%02d' | format(s) }}.{{ '%02d' | format(c) }}
+                            </td>
+                            <td style="text-align:center; font-weight:700; color:var(--text-primary);">
+                                {{ entry.result.points or 0 }}
                             </td>
                         </tr>
                         {% endfor %}
