@@ -41,6 +41,12 @@ def cadastros():
         else:
             group_event_counts["Sem Grupo"] += 1
 
+    # Students per turma (Group model)
+    turma_student_counts = {g.id: 0 for g in groups}
+    for s in students:
+        if s.group_id and s.group_id in turma_student_counts:
+            turma_student_counts[s.group_id] += 1
+
     return render_template(
         "cadastros.html",
         students=students,
@@ -50,6 +56,7 @@ def cadastros():
         year_counts=dict(year_counts),
         group_student_counts=group_student_counts,
         group_event_counts=dict(group_event_counts),
+        turma_student_counts=turma_student_counts,
     )
 
 

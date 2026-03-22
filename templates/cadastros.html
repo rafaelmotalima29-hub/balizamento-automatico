@@ -226,41 +226,65 @@
                     <input type="text" id="event_name" name="name"
                            placeholder="ex: 50m Livre, 4x25m Misto" required />
                 </div>
+
+                <!-- BASE / TURMA — in destaque, como seleção de lista no e-mail marketing -->
                 <div class="form-group">
-                    <label>Grupos de Competição</label>
+                    <label for="event_group_id">
+                        Base / Turma Participante
+                        <span style="font-weight:400; color:var(--text-muted); font-size:12px;">(opcional)</span>
+                    </label>
+                    <select id="event_group_id" name="group_id" onchange="autoCalcNewEvent()">
+                        <option value="">Todas as Bases (Aberto)</option>
+                        {% for g in groups %}
+                        {% set cnt = turma_student_counts.get(g.id, 0) %}
+                        <option value="{{ g.id }}">{{ g.name }} — {{ cnt }} aluno{{ 's' if cnt != 1 else '' }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if not groups %}
+                    <p style="font-size:11px; color:var(--text-muted); margin-top:6px;">
+                        💡 Crie bases na aba <strong>Turmas</strong> para segmentar participantes.
+                    </p>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label>Grupos de Competição (Faixa Etária)</label>
                     <div style="display:flex; flex-direction:column; gap:8px; padding:12px; background:var(--bg-card); border:1px solid var(--border); border-radius:8px;">
                         {% for group in competition_groups %}
-                        <label style="display:flex; align-items:center; gap:8px; font-weight:normal; cursor:pointer; margin:0;">
-                            <input type="checkbox" name="competition_group" value="{{ group }}" style="width:16px; height:16px;">
-                            {{ group }}
+                        {% set gcnt = group_student_counts.get(group, 0) %}
+                        <label style="display:flex; align-items:center; justify-content:space-between; font-weight:normal; cursor:pointer; margin:0;">
+                            <span style="display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" name="competition_group" value="{{ group }}"
+                                       class="new-event-group-cb" style="width:16px; height:16px;"
+                                       onchange="autoCalcNewEvent()">
+                                {{ group }}
+                            </span>
+                            <span style="font-size:11px; color:var(--text-muted);">{{ gcnt }} alunos</span>
                         </label>
                         {% endfor %}
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="event_group_id">Restrito à Turma (Opcional)</label>
-                    <select id="event_group_id" name="group_id">
-                        <option value="">Qualquer Turma (Aberto)</option>
-                        {% for g in groups %}
-                        <option value="{{ g.id }}">{{ g.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="num_series">Nº de Séries</label>
+                        <label for="num_series">
+                            Nº de Séries
+                            <span id="new-series-auto-badge" style="display:none; font-size:10px; font-weight:600; color:var(--accent); background:rgba(99,102,241,.12); padding:2px 6px; border-radius:10px; margin-left:4px;">AUTO</span>
+                        </label>
                         <input type="number" id="num_series" name="num_series"
-                               min="1" max="50" value="1" required />
+                               min="1" max="50" value="1" required
+                               oninput="document.getElementById('new-series-auto-badge').style.display='none'" />
                     </div>
                     <div class="form-group">
                         <label for="athletes_per_series">Raias por Série</label>
                         <input type="number" id="athletes_per_series" name="athletes_per_series"
-                               min="1" max="20" value="8" required />
+                               min="1" max="20" value="8" required
+                               oninput="autoCalcNewEvent()" />
                     </div>
                 </div>
-                <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
-                    💡 Ex: 2 séries × 8 raias = 16 alunos nessa prova.
-                </p>
+                <div id="new-series-hint" style="font-size:12px; color:var(--text-muted); margin-bottom:14px; min-height:18px;">
+                    💡 Selecione grupos para calcular séries automaticamente.
+                </div>
                 <button type="submit" class="btn btn-primary" style="width:100%;">
                     Cadastrar Prova
                 </button>
@@ -367,59 +391,113 @@
     <div class="cadastro-layout">
         <div class="card cadastro-form-col">
             <div class="card-header">
-                <div class="card-title">➕ Cadastrar Turma</div>
+                <div class="card-title">➕ Nova Base / Turma</div>
             </div>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px; line-height:1.5;">
+                Bases organizam seus alunos em grupos. Ao criar uma prova, você seleciona qual base participa — como listas em plataformas de e-mail.
+            </p>
             <form method="POST" action="{{ url_for('cadastros.add_group') }}">
                 <div class="form-group">
-                    <label for="group_name">Nome da Turma</label>
+                    <label for="group_name">Nome da Base / Turma</label>
                     <input type="text" id="group_name" name="name"
-                           placeholder="ex: Turma da Manhã, SESI" required autocomplete="off" />
+                           placeholder="ex: Turma da Manhã, SESI, Escola X" required autocomplete="off" />
                 </div>
                 <button type="submit" class="btn btn-primary" style="width:100%;">
-                    Cadastrar Turma
+                    Criar Base
                 </button>
             </form>
+
+            {% if groups %}
+            <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
+                <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px;">
+                    Resumo das Bases
+                </div>
+                {% for g in groups %}
+                {% set cnt = turma_student_counts.get(g.id, 0) %}
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px;">
+                    <span style="color:var(--text-secondary);">{{ g.name }}</span>
+                    <span class="count-pill" style="{% if cnt == 0 %}opacity:0.5;{% endif %}">{{ cnt }} aluno{{ 's' if cnt != 1 else '' }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
 
         <div class="card cadastro-list-col" style="padding:0; overflow:hidden;">
             <div class="card-header" style="padding:16px 20px;">
-                <div class="card-title">👥 Turmas Cadastradas</div>
+                <div class="card-title">📋 Bases Cadastradas</div>
+                <span class="count-pill">{{ groups | length }}</span>
             </div>
             {% if groups %}
-            <div class="table-wrapper" style="border:none; border-radius:0;">
-                <table id="groups-table">
-                    <thead>
-                        <tr>
-                            <th>Nome da Turma</th>
-                            <th>Data de Criação</th>
-                            <th style="text-align:right; width:80px;"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="groups-tbody">
-                        {% for g in groups %}
-                        <tr id="group-row-{{ g.id }}">
-                            <td id="g-name-{{ g.id }}"><strong>{{ g.name }}</strong></td>
-                            <td style="color:var(--text-muted);">{{ g.created_at.strftime('%d/%m/%Y') if g.created_at else '—' }}</td>
-                            <td style="text-align:right;">
-                                <div style="display:inline-flex; gap:4px;">
-                                    <button class="btn btn-danger btn-sm btn-icon" title="Remover turma"
-                                        onclick="confirmDelete('{{ url_for('cadastros.delete_group', group_id=g.id) }}', 'group-row-{{ g.id }}', '{{ g.name | replace("'", "\'") }}')">
-                                        🗑️
-                                    </button>
+            <div style="padding:8px 0;">
+                {% for g in groups %}
+                {% set cnt = turma_student_counts.get(g.id, 0) %}
+                <div id="group-row-{{ g.id }}" style="display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--border); transition:background .15s;"
+                     onmouseover="this.style.background='var(--bg-hover,rgba(255,255,255,.04))'" onmouseout="this.style.background=''">
+                    <div style="flex:1;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <div style="width:36px; height:36px; border-radius:8px; background:var(--accent); opacity:.15; flex-shrink:0;"></div>
+                            <div style="margin-left:-36px; width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">📋</div>
+                            <div>
+                                <div id="g-name-{{ g.id }}" style="font-weight:600; font-size:14px;">{{ g.name }}</div>
+                                <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+                                    {% if cnt == 0 %}
+                                        <span style="color:var(--text-muted);">Nenhum aluno cadastrado</span>
+                                    {% elif cnt == 1 %}
+                                        <span style="color:var(--accent);">1 aluno</span>
+                                    {% else %}
+                                        <span style="color:var(--accent);">{{ cnt }} alunos</span>
+                                    {% endif %}
+                                    <span style="margin-left:8px; opacity:.5;">· criada {{ g.created_at.strftime('%d/%m/%Y') if g.created_at else '' }}</span>
                                 </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:inline-flex; gap:4px; align-items:center;">
+                        <span class="count-pill" style="font-size:13px; {% if cnt == 0 %}opacity:0.4;{% endif %}">{{ cnt }}</span>
+                        <button class="btn btn-ghost btn-sm btn-icon" title="Renomear base"
+                            onclick="openEditGroup({{ g.id }}, '{{ g.name | replace("'", "\\'") }}')">
+                            ✏️
+                        </button>
+                        <button class="btn btn-danger btn-sm btn-icon" title="Remover base"
+                            onclick="confirmDelete('{{ url_for('cadastros.delete_group', group_id=g.id) }}', 'group-row-{{ g.id }}', '{{ g.name | replace("'", "\\'") }}')">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
             {% else %}
             <div class="empty-state" style="padding:48px;">
-                <span class="empty-state-icon">👥</span>
-                <h3>Nenhuma Turma</h3>
-                <p>Cadastre as turmas para organizar seus alunos.</p>
+                <span class="empty-state-icon">📋</span>
+                <h3>Nenhuma Base</h3>
+                <p>Crie uma base para organizar quais alunos participam de cada prova.</p>
             </div>
             {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     EDIT GROUP MODAL
+══════════════════════════════════════════ -->
+<div class="modal-overlay" id="edit-group-modal">
+    <div class="modal-box" style="max-width:400px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+            <div class="modal-title" style="margin-bottom:0;">✏️ Renomear Base</div>
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="closeModal('edit-group-modal')" style="font-size:18px;">✕</button>
+        </div>
+        <input type="hidden" id="edit-group-id" />
+        <div class="form-group">
+            <label for="edit-group-name">Nome da Base / Turma</label>
+            <input type="text" id="edit-group-name" placeholder="ex: Turma da Manhã" autocomplete="off" />
+        </div>
+        <div id="edit-group-error" class="edit-modal-error" style="display:none;"></div>
+        <div class="modal-actions" style="margin-top:8px;">
+            <button class="btn btn-ghost" onclick="closeModal('edit-group-modal')">Cancelar</button>
+            <button class="btn btn-primary" id="edit-group-save" onclick="submitEditGroup()">
+                Salvar
+            </button>
         </div>
     </div>
 </div>
@@ -487,7 +565,7 @@
      EDIT EVENT MODAL
 ══════════════════════════════════════════ -->
 <div class="modal-overlay" id="edit-event-modal">
-    <div class="modal-box" style="max-width:460px;">
+    <div class="modal-box" style="max-width:480px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
             <div>
                 <div class="modal-title" style="margin-bottom:0;">✏️ Editar Prova</div>
@@ -501,35 +579,50 @@
             <input type="text" id="edit-event-name" placeholder="ex: 50m Livre" autocomplete="off" />
         </div>
         <div class="form-group">
-            <label>Grupos de Competição</label>
+            <label for="edit-event-group">
+                Base / Turma Participante
+                <span style="font-weight:400; color:var(--text-muted); font-size:12px;">(opcional)</span>
+            </label>
+            <select id="edit-event-group" onchange="autoCalcEditEvent()">
+                <option value="">Todas as Bases (Aberto)</option>
+                {% for g in groups %}
+                {% set cnt = turma_student_counts.get(g.id, 0) %}
+                <option value="{{ g.id }}">{{ g.name }} — {{ cnt }} aluno{{ 's' if cnt != 1 else '' }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Grupos de Competição (Faixa Etária)</label>
             <div style="display:flex; flex-direction:column; gap:8px; padding:12px; background:var(--bg-card); border:1px solid var(--border); border-radius:8px;">
                 {% for group in competition_groups %}
-                <label style="display:flex; align-items:center; gap:8px; font-weight:normal; cursor:pointer; margin:0;">
-                    <input type="checkbox" value="{{ group }}" class="edit-group-cb" style="width:16px; height:16px;">
-                    {{ group }}
+                {% set gcnt = group_student_counts.get(group, 0) %}
+                <label style="display:flex; align-items:center; justify-content:space-between; font-weight:normal; cursor:pointer; margin:0;">
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        <input type="checkbox" value="{{ group }}" class="edit-group-cb" style="width:16px; height:16px;"
+                               onchange="autoCalcEditEvent()">
+                        {{ group }}
+                    </span>
+                    <span style="font-size:11px; color:var(--text-muted);">{{ gcnt }} alunos</span>
                 </label>
                 {% endfor %}
             </div>
         </div>
-        <div class="form-group">
-            <label for="edit-event-group">Restrito à Turma (Opcional)</label>
-            <select id="edit-event-group">
-                <option value="">Qualquer Turma (Aberto)</option>
-                {% for g in groups %}
-                <option value="{{ g.id }}">{{ g.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
         <div class="form-row">
             <div class="form-group">
-                <label for="edit-event-series">Nº de Séries</label>
-                <input type="number" id="edit-event-series" min="1" max="50" />
+                <label for="edit-event-series">
+                    Nº de Séries
+                    <span id="edit-series-auto-badge" style="display:none; font-size:10px; font-weight:600; color:var(--accent); background:rgba(99,102,241,.12); padding:2px 6px; border-radius:10px; margin-left:4px;">AUTO</span>
+                </label>
+                <input type="number" id="edit-event-series" min="1" max="50"
+                       oninput="document.getElementById('edit-series-auto-badge').style.display='none'" />
             </div>
             <div class="form-group">
                 <label for="edit-event-lanes">Raias por Série</label>
-                <input type="number" id="edit-event-lanes" min="1" max="20" />
+                <input type="number" id="edit-event-lanes" min="1" max="20"
+                       oninput="autoCalcEditEvent()" />
             </div>
         </div>
+        <div id="edit-series-hint" style="font-size:12px; color:var(--text-muted); margin-bottom:8px; min-height:18px;"></div>
         <div id="edit-event-error" class="edit-modal-error" style="display:none;"></div>
         <div class="modal-actions" style="margin-top:8px;">
             <button class="btn btn-ghost" onclick="closeModal('edit-event-modal')">Cancelar</button>
@@ -544,6 +637,119 @@
 
 {% block extra_js %}
 <script>
+// ── Student data for auto-calculation ────────────────────────────────
+const STUDENTS_DATA = [
+    {% for s in students %}
+    { year: {{ s.school_year | tojson }}, group_id: {{ s.group_id if s.group_id else 'null' }} }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+const COMP_GROUP_YEARS = {
+    "6º e 7º Ano":  ["6º Ano", "7º Ano"],
+    "8º e 9º Ano":  ["8º Ano", "9º Ano"],
+    "Ensino Médio": ["1º Ano Médio", "2º Ano Médio", "3º Ano Médio"]
+};
+
+function countEligibleStudents(selectedCompGroups, groupId) {
+    const eligibleYears = selectedCompGroups.flatMap(g => COMP_GROUP_YEARS[g] || []);
+    return STUDENTS_DATA.filter(s => {
+        const matchTurma = !groupId || String(s.group_id) === String(groupId);
+        const matchYear  = eligibleYears.length === 0 || eligibleYears.includes(s.year);
+        return matchTurma && matchYear;
+    }).length;
+}
+
+function autoCalcNewEvent() {
+    const selectedGroups = Array.from(document.querySelectorAll('.new-event-group-cb:checked')).map(el => el.value);
+    const groupId  = document.getElementById('event_group_id')?.value || '';
+    const lanes    = parseInt(document.getElementById('athletes_per_series')?.value) || 8;
+    const seriesEl = document.getElementById('num_series');
+    const hintEl   = document.getElementById('new-series-hint');
+    const badgeEl  = document.getElementById('new-series-auto-badge');
+
+    if (selectedGroups.length === 0) {
+        if (hintEl) hintEl.textContent = '💡 Selecione grupos de competição para calcular séries automaticamente.';
+        if (badgeEl) badgeEl.style.display = 'none';
+        return;
+    }
+
+    const count  = countEligibleStudents(selectedGroups, groupId);
+    const series = count > 0 ? Math.max(1, Math.ceil(count / lanes)) : 1;
+    if (seriesEl) seriesEl.value = series;
+    if (badgeEl) badgeEl.style.display = '';
+    if (hintEl) {
+        const turmaLabel = groupId ? '' : ' (todas as bases)';
+        hintEl.innerHTML = `✅ <strong>${count} alunos elegíveis${turmaLabel}</strong> → <strong>${series} série(s)</strong> × ${lanes} raias`;
+    }
+}
+
+function autoCalcEditEvent() {
+    const selectedGroups = Array.from(document.querySelectorAll('.edit-group-cb:checked')).map(el => el.value);
+    const groupId  = document.getElementById('edit-event-group')?.value || '';
+    const lanes    = parseInt(document.getElementById('edit-event-lanes')?.value) || 8;
+    const seriesEl = document.getElementById('edit-event-series');
+    const hintEl   = document.getElementById('edit-series-hint');
+    const badgeEl  = document.getElementById('edit-series-auto-badge');
+
+    if (selectedGroups.length === 0) {
+        if (hintEl) hintEl.textContent = '';
+        if (badgeEl) badgeEl.style.display = 'none';
+        return;
+    }
+
+    const count  = countEligibleStudents(selectedGroups, groupId);
+    const series = count > 0 ? Math.max(1, Math.ceil(count / lanes)) : (parseInt(seriesEl?.value) || 1);
+    if (seriesEl) seriesEl.value = series;
+    if (badgeEl) badgeEl.style.display = '';
+    if (hintEl) {
+        const turmaLabel = groupId ? '' : ' (todas as bases)';
+        hintEl.innerHTML = `✅ <strong>${count} alunos elegíveis${turmaLabel}</strong> → <strong>${series} série(s)</strong> × ${lanes} raias`;
+    }
+}
+
+// ── Edit Group (Base) ─────────────────────────────────────────────────
+function openEditGroup(id, name) {
+    document.getElementById('edit-group-id').value   = id;
+    document.getElementById('edit-group-name').value = name;
+    document.getElementById('edit-group-error').style.display = 'none';
+    document.getElementById('edit-group-modal').classList.add('active');
+    document.getElementById('edit-group-name').focus();
+}
+
+async function submitEditGroup() {
+    const id   = document.getElementById('edit-group-id').value;
+    const name = document.getElementById('edit-group-name').value.trim();
+    const errEl  = document.getElementById('edit-group-error');
+    const saveBtn = document.getElementById('edit-group-save');
+
+    errEl.style.display = 'none';
+    if (!name) { errEl.textContent = 'Informe o nome da base.'; errEl.style.display = 'block'; return; }
+
+    saveBtn.disabled = true; saveBtn.textContent = '⏳ Salvando...';
+    try {
+        const res  = await fetch(`/cadastros/grupo/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+            const nameEl = document.getElementById(`g-name-${id}`);
+            if (nameEl) nameEl.textContent = data.group.name;
+            closeModal('edit-group-modal');
+            showToast(`Base "${data.group.name}" renomeada.`, 'success');
+        } else {
+            errEl.textContent = data.error || 'Erro ao salvar.';
+            errEl.style.display = 'block';
+        }
+    } catch (e) {
+        errEl.textContent = 'Falha de conexão. Tente novamente.';
+        errEl.style.display = 'block';
+    } finally {
+        saveBtn.disabled = false; saveBtn.textContent = 'Salvar';
+    }
+}
+
 // ── Student filter ───────────────────────────────────────────────────
 let activeStudentYear = 'all';
 
@@ -679,9 +885,13 @@ function openEditEvent(id, name, group, numSeries, lanes, groupId) {
     document.getElementById('edit-event-series').value  = numSeries;
     document.getElementById('edit-event-lanes').value   = lanes;
     document.getElementById('edit-event-subtitle').textContent = `${numSeries} série(s) × ${lanes} raias`;
-    document.getElementById('edit-event-error').style.display = 'none';
+    document.getElementById('edit-event-error').style.display  = 'none';
+    document.getElementById('edit-series-auto-badge').style.display = 'none';
+    document.getElementById('edit-series-hint').textContent = '';
     document.getElementById('edit-event-modal').classList.add('active');
     document.getElementById('edit-event-name').focus();
+    // Show hint for current selection
+    autoCalcEditEvent();
 }
 
 async function submitEditEvent() {
