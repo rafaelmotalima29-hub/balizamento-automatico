@@ -14,31 +14,51 @@
 
 <!-- ── Stat Cards ──────────────────────────────────────────────────── -->
 <div class="grid-3 stat-grid" style="margin-bottom: 32px;">
+    {% if has_results %}
     <div class="stat-card">
         <span class="stat-icon">🏊‍♂️</span>
         <div class="stat-info">
             <div class="stat-value">{{ team_ranking | length }}</div>
-            <div class="stat-label">Equipes</div>
+            <div class="stat-label">Anos com Resultado</div>
         </div>
     </div>
     <div class="stat-card">
         <span class="stat-icon">🏅</span>
         <div class="stat-info">
-            <div class="stat-value">{{ event_results | length }}</div>
+            <div class="stat-value">{{ event_results | selectattr('1') | list | length }}</div>
             <div class="stat-label">Provas Realizadas</div>
         </div>
     </div>
     <div class="stat-card">
         <span class="stat-icon">⭐</span>
         <div class="stat-info">
-            <div class="stat-value">
-                {% if team_ranking %}
-                {{ team_ranking[0].total_points }}
-                {% else %}—{% endif %}
-            </div>
+            <div class="stat-value">{{ team_ranking[0].total_points if team_ranking else '—' }}</div>
             <div class="stat-label">Pontos do Líder</div>
         </div>
     </div>
+    {% else %}
+    <div class="stat-card">
+        <span class="stat-icon">🤽</span>
+        <div class="stat-info">
+            <div class="stat-value">{{ student_count }}</div>
+            <div class="stat-label">Alunos Cadastrados</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <span class="stat-icon">🏁</span>
+        <div class="stat-info">
+            <div class="stat-value">{{ event_count }}</div>
+            <div class="stat-label">Provas Cadastradas</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <span class="stat-icon">👥</span>
+        <div class="stat-info">
+            <div class="stat-value">{{ group_count }}</div>
+            <div class="stat-label">Turmas / Bases</div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <!-- ── Team Ranking ───────────────────────────────────────────────── -->
@@ -50,21 +70,26 @@
     <h3>Nenhum resultado ainda</h3>
     <p>Siga o fluxo abaixo para processar os resultados da competição:</p>
 </div>
-<div class="grid-3" style="margin-top: 20px; margin-bottom: 40px;">
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-top:20px; margin-bottom:40px;">
     <a href="{{ url_for('cadastros.cadastros') }}" class="card" style="text-decoration:none; text-align:center; padding:24px; transition: border-color var(--transition); cursor:pointer;">
         <div style="font-size:36px; margin-bottom:12px;">📝</div>
         <div style="font-size:14px; font-weight:700; margin-bottom:6px; color:var(--text-primary);">1. Cadastros</div>
-        <div style="font-size:12px; color:var(--text-muted); line-height:1.5;">Registre os alunos e as provas do evento</div>
+        <div style="font-size:12px; color:var(--text-muted); line-height:1.5;">Registre alunos, provas e turmas</div>
     </a>
     <a href="{{ url_for('balizamento.balizamento') }}" class="card" style="text-decoration:none; text-align:center; padding:24px; transition: border-color var(--transition); cursor:pointer;">
-        <div style="font-size:36px; margin-bottom:12px;">📤</div>
+        <div style="font-size:36px; margin-bottom:12px;">🎯</div>
         <div style="font-size:14px; font-weight:700; margin-bottom:6px; color:var(--text-primary);">2. Balizamento</div>
-        <div style="font-size:12px; color:var(--text-muted); line-height:1.5;">Exporte a planilha e preencha os tempos</div>
+        <div style="font-size:12px; color:var(--text-muted); line-height:1.5;">Exporte a planilha com séries e raias</div>
     </a>
     <a href="{{ url_for('upload.upload') }}" class="card" style="text-decoration:none; text-align:center; padding:24px; transition: border-color var(--transition); cursor:pointer;">
         <div style="font-size:36px; margin-bottom:12px;">⬆️</div>
         <div style="font-size:14px; font-weight:700; margin-bottom:6px; color:var(--text-primary);">3. Upload</div>
-        <div style="font-size:12px; color:var(--text-muted); line-height:1.5;">Envie a planilha preenchida para calcular o ranking</div>
+        <div style="font-size:12px; color:var(--text-muted); line-height:1.5;">Envie a planilha com os tempos preenchidos</div>
+    </a>
+    <a href="{{ url_for('resultados.resultados') }}" class="card" style="text-decoration:none; text-align:center; padding:24px; transition: border-color var(--transition); cursor:pointer;">
+        <div style="font-size:36px; margin-bottom:12px;">🏆</div>
+        <div style="font-size:14px; font-weight:700; margin-bottom:6px; color:var(--text-primary);">4. Resultados</div>
+        <div style="font-size:12px; color:var(--text-muted); line-height:1.5;">Veja o ranking e os tempos de cada prova</div>
     </a>
 </div>
 {% else %}

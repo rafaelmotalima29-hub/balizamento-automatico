@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template
 from flask_login import login_required
 from sqlalchemy import func
-from models import Student, Result, Event
+from models import Student, Result, Event, Group
 from extensions import db
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -57,9 +57,16 @@ def index():
 
     has_results = Result.query.count() > 0
 
+    student_count = Student.query.count()
+    event_count   = Event.query.count()
+    group_count   = Group.query.count()
+
     return render_template(
         "dashboard.html",
         team_ranking=team_ranking,
         event_results=event_results,
         has_results=has_results,
+        student_count=student_count,
+        event_count=event_count,
+        group_count=group_count,
     )

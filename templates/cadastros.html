@@ -322,9 +322,16 @@
             <div class="list-toolbar" style="border-bottom:1px solid var(--border);">
                 <div class="filter-pills" id="event-group-pills">
                     <button class="filter-pill active" onclick="setEventGroup('all', this)">Todos</button>
-                    {% set event_group_names = [] %}
-                    {% for e in events %}{% if e.competition_group and e.competition_group not in event_group_names %}{% set _ = event_group_names.append(e.competition_group) %}{% endif %}{% endfor %}
-                    {% for g in event_group_names | sort %}
+                    {% set unique_groups = [] %}
+                    {% for e in events %}
+                        {% if e.competition_group %}
+                            {% for g in e.competition_group.split(',') %}
+                                {% set gstrip = g.strip() %}
+                                {% if gstrip and gstrip not in unique_groups %}{% set _ = unique_groups.append(gstrip) %}{% endif %}
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                    {% for g in unique_groups | sort %}
                     <button class="filter-pill" onclick="setEventGroup('{{ g }}', this)">{{ g }}</button>
                     {% endfor %}
                 </div>
@@ -347,9 +354,13 @@
                         <tr id="event-row-{{ e.id }}" data-group="{{ e.competition_group or '' }}">
                             <td id="e-name-{{ e.id }}"><strong>{{ e.name }}</strong></td>
                             <td id="e-group-{{ e.id }}">
-                                <span class="badge badge-accent" style="font-size:11px;">
-                                    {{ e.competition_group or '—' }}
-                                </span>
+                                {% if e.competition_group %}
+                                    {% for g in e.competition_group.split(',') %}
+                                    <span class="badge badge-accent" style="font-size:11px; margin:1px 2px;">{{ g.strip() }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span style="color:var(--text-muted);">—</span>
+                                {% endif %}
                             </td>
                             <td id="e-tgroup-{{ e.id }}" style="color:var(--text-muted);">{{ e.group.name if e.group else 'Aberto' }}</td>
                             <td id="e-series-{{ e.id }}" style="color:var(--text-muted);">{{ e.num_series }}×</td>
@@ -861,7 +872,8 @@ function setEventGroup(group, btn) {
     document.querySelectorAll('#event-group-pills .filter-pill').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.querySelectorAll('#events-tbody tr').forEach(row => {
-        row.style.display = (group === 'all' || row.dataset.group === group) ? '' : 'none';
+        const rowGroups = row.dataset.group ? row.dataset.group.split(',').map(g => g.trim()) : [];
+        row.style.display = (group === 'all' || rowGroups.includes(group)) ? '' : 'none';
     });
 }
 
@@ -1008,8 +1020,10 @@ async function submitEditEvent() {
             if (row) {
                 row.dataset.group = e.competition_group;
                 document.getElementById(`e-name-${id}`).innerHTML  = `<strong>${escHtml(e.name)}</strong>`;
-                document.getElementById(`e-group-${id}`).innerHTML =
-                    `<span class="badge badge-accent" style="font-size:11px;">${escHtml(e.competition_group || '—')}</span>`;
+                const groupBadges = e.competition_group
+                    ? e.competition_group.split(',').map(g => `<span class="badge badge-accent" style="font-size:11px; margin:1px 2px;">${escHtml(g.trim())}</span>`).join('')
+                    : '<span style="color:var(--text-muted);">—</span>';
+                document.getElementById(`e-group-${id}`).innerHTML = groupBadges;
                 if(document.getElementById(`e-restricted-group-${id}`)) document.getElementById(`e-restricted-group-${id}`).innerHTML = 
                     `<span style="font-size:12px; color:var(--text-muted);">${e.group_name || 'Aberto'}</span>`;
                 document.getElementById(`e-series-${id}`).textContent = `${e.num_series}×`;
