@@ -6,58 +6,118 @@
 
 {% block topbar_actions %}
 {% if has_data %}
-<button class="btn btn-primary" id="btn-export-selected" onclick="exportSelectedGroups()">
-    📊 Exportar Selecionados
+<button class="btn btn-primary" onclick="exportCurrent()">
+    📊 Exportar Planilha
 </button>
 {% endif %}
 {% endblock %}
 
 {% block content %}
 
-{% if not has_data %}
-<!-- ── Empty state ── -->
-<div class="empty-state" style="margin-top: 40px;">
+<!-- ══════════════════════════════════════════
+     PAINEL DE SELEÇÃO
+══════════════════════════════════════════ -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header" style="margin-bottom:16px;">
+        <div class="card-title">🎯 Selecionar Prova e Base</div>
+        {% if has_selection and has_data %}
+        <a href="{{ url_for('balizamento.balizamento') }}" class="btn btn-ghost btn-sm">✕ Limpar filtros</a>
+        {% endif %}
+    </div>
+
+    <form method="GET" action="{{ url_for('balizamento.balizamento') }}" id="bal-filter-form">
+        <div class="form-row" style="gap:16px; align-items:flex-end;">
+            <div class="form-group" style="flex:1; margin-bottom:0;">
+                <label for="sel-event">Prova</label>
+                <select id="sel-event" name="event_id" onchange="document.getElementById('bal-filter-form').submit()">
+                    <option value="">— Todas as Provas —</option>
+                    {% for e in all_events %}
+                    <option value="{{ e.id }}" {% if selected_event_id == e.id %}selected{% endif %}>
+                        {{ e.name }}
+                        {% if e.competition_group %} · {{ e.competition_group }}{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="flex:1; margin-bottom:0;">
+                <label for="sel-base">Base / Turma</label>
+                <select id="sel-base" name="base_id" onchange="document.getElementById('bal-filter-form').submit()">
+                    <option value="">— Todas as Bases —</option>
+                    {% for b in all_bases %}
+                    <option value="{{ b.id }}" {% if selected_base_id == b.id %}selected{% endif %}>
+                        {{ b.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if not has_selection %}
+            <div style="flex-shrink:0; padding-bottom:1px;">
+                <button type="submit" class="btn btn-primary">Ver Balizamento</button>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if selected_event_id or selected_base_id %}
+        <!-- Tags de filtro ativo -->
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;">
+            {% if selected_event_id %}
+            {% set ev = all_events | selectattr('id', 'equalto', selected_event_id) | first %}
+            {% if ev %}
+            <span style="display:inline-flex; align-items:center; gap:6px; background:rgba(0,201,177,.1); border:1px solid rgba(0,201,177,.3); color:var(--accent); font-size:12px; font-weight:600; padding:4px 10px; border-radius:20px;">
+                🏁 {{ ev.name }}
+            </span>
+            {% endif %}
+            {% endif %}
+            {% if selected_base_id %}
+            {% set base = all_bases | selectattr('id', 'equalto', selected_base_id) | first %}
+            {% if base %}
+            <span style="display:inline-flex; align-items:center; gap:6px; background:rgba(99,102,241,.1); border:1px solid rgba(99,102,241,.3); color:#818cf8; font-size:12px; font-weight:600; padding:4px 10px; border-radius:20px;">
+                📋 {{ base.name }}
+            </span>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endif %}
+    </form>
+
+    {% if not all_events %}
+    <p style="margin-top:12px; font-size:13px; color:var(--text-muted);">
+        Nenhuma prova cadastrada ainda.
+        <a href="{{ url_for('cadastros.cadastros') }}">Ir para Cadastros →</a>
+    </p>
+    {% endif %}
+</div>
+
+<!-- ══════════════════════════════════════════
+     ESTADOS
+══════════════════════════════════════════ -->
+{% if not has_selection %}
+<div class="card" style="text-align:center; padding:56px 32px;">
+    <span style="font-size:52px; display:block; margin-bottom:16px;">🎯</span>
+    <h3 style="margin-bottom:8px;">Selecione uma prova e/ou base</h3>
+    <p style="color:var(--text-muted); max-width:400px; margin:0 auto;">
+        Use os filtros acima para visualizar a distribuição de séries e raias e depois exportar a planilha.
+    </p>
+</div>
+
+{% elif not has_data %}
+<div class="empty-state" style="margin-top:16px;">
     <span class="empty-state-icon">📭</span>
-    <h3>Sem dados para exportar</h3>
-    <p>Cadastre alunos e provas primeiro para gerar a planilha de balizamento.</p>
+    <h3>Nenhum dado para essa seleção</h3>
+    <p>A prova ou base selecionada não possui alunos ou provas compatíveis.</p>
     <br />
     <a href="{{ url_for('cadastros.cadastros') }}" class="btn btn-primary">Ir para Cadastros</a>
 </div>
 
 {% else %}
 
-<!-- ── Group selection checkboxes ──────────────────────────────────── -->
-<div class="bal-filter-bar">
-    <div class="bal-group-checkboxes" id="group-checkboxes">
-        <label class="bal-group-check-label" style="font-weight:700; color:var(--text-muted); margin-right:8px;">
-            Selecione os grupos:
-        </label>
-        <label class="bal-check-pill">
-            <input type="checkbox" id="check-all-groups" onchange="toggleAllGroups(this)" checked />
-            <span class="bal-check-pill-text">🌐 Todos</span>
-        </label>
-        {% for group in competition_groups %}
-        {% if group in preview %}
-        <label class="bal-check-pill">
-            <input type="checkbox" class="group-checkbox" value="{{ group }}"
-                   data-group="{{ group }}" onchange="onGroupCheckChange()" checked />
-            <span class="bal-check-pill-text">
-                {{ group }}
-                <span class="count-pill" style="margin-left:4px;">
-                    {{ group_stats[group].events }} prova(s)
-                </span>
-            </span>
-        </label>
-        {% endif %}
-        {% endfor %}
-    </div>
-</div>
-
-<!-- ── Per-group sections ─────────────────────────────────────────── -->
+<!-- ══════════════════════════════════════════
+     PREVIEW POR GRUPO
+══════════════════════════════════════════ -->
 {% for group_name, event_series_list in preview.items() %}
-<div class="bal-group-section" data-group="{{ group_name }}" id="bal-group-{{ loop.index }}">
+<div class="bal-group-section" data-group="{{ group_name }}">
 
-    <!-- Group header card -->
+    <!-- Group header -->
     <div class="bal-group-header">
         <div class="bal-group-title">
             <span class="bal-group-icon">🏊</span>
@@ -69,12 +129,9 @@
                 </div>
             </div>
         </div>
-        <span class="badge badge-accent" style="font-size:12px;">
-            {{ group_name }}
-        </span>
+        <span class="badge badge-accent" style="font-size:12px;">{{ group_name }}</span>
     </div>
 
-    <!-- Events for this group -->
     {% for event, series_list in event_series_list %}
     <div class="bal-event-block">
         <div class="bal-event-title">
@@ -85,7 +142,6 @@
             </span>
         </div>
 
-        <!-- Series previewed as stacked blocks -->
         {% for serie in series_list %}
         {% set serie_num = loop.index %}
         <div class="bal-serie-block">
@@ -127,13 +183,13 @@
 </div>
 {% endfor %}
 
-<!-- ── Instructions card ─────────────────────────────────────────── -->
-<div class="card bal-instructions">
+<!-- ── Instructions ──────────────────────────────────────────────── -->
+<div class="card bal-instructions" style="margin-top:24px;">
     <div class="card-title" style="margin-bottom:16px;">📋 Como usar</div>
     <ol style="display:flex; flex-direction:column; gap:10px; padding-left:20px; color:var(--text-secondary); font-size:14px;">
-        <li>Filtre por grupo (opcional) e clique em <strong style="color:var(--accent);">Exportar</strong>.</li>
+        <li>Selecione a prova e a base, depois clique em <strong style="color:var(--accent);">Exportar Planilha</strong>.</li>
         <li>Abra no Excel/Google Sheets e preencha <strong>Minutos</strong>, <strong>Segundos</strong> e <strong>Centésimos</strong> para cada raia.</li>
-        <li>Para aluno <strong>desclassificado ou ausente</strong>, use:
+        <li>Para aluno <strong>desclassificado ou ausente</strong>: use
             <code style="background:var(--bg-input); padding:2px 6px; border-radius:4px;">9</code> /
             <code style="background:var(--bg-input); padding:2px 6px; border-radius:4px;">99</code> /
             <code style="background:var(--bg-input); padding:2px 6px; border-radius:4px;">99</code>.
@@ -148,55 +204,13 @@
 
 {% block extra_js %}
 <script>
-function getSelectedGroups() {
-    return Array.from(document.querySelectorAll('.group-checkbox:checked')).map(cb => cb.value);
-}
-
-function toggleAllGroups(allCb) {
-    const checked = allCb.checked;
-    document.querySelectorAll('.group-checkbox').forEach(cb => { cb.checked = checked; });
-    updateGroupVisibility();
-    updateExportButton();
-}
-
-function onGroupCheckChange() {
-    const allBoxes = document.querySelectorAll('.group-checkbox');
-    const allChecked = Array.from(allBoxes).every(cb => cb.checked);
-    document.getElementById('check-all-groups').checked = allChecked;
-    updateGroupVisibility();
-    updateExportButton();
-}
-
-function updateGroupVisibility() {
-    const selected = getSelectedGroups();
-    document.querySelectorAll('.bal-group-section').forEach(section => {
-        section.style.display = selected.includes(section.dataset.group) ? '' : 'none';
-    });
-}
-
-function updateExportButton() {
-    const btn = document.getElementById('btn-export-selected');
-    const count = getSelectedGroups().length;
-    if (count === 0) {
-        btn.disabled = true;
-        btn.textContent = '📊 Nenhum grupo selecionado';
-    } else {
-        btn.disabled = false;
-        btn.textContent = '📊 Exportar ' + count + ' grupo(s)';
-    }
-}
-
-function exportSelectedGroups() {
-    const groups = getSelectedGroups();
-    if (groups.length === 0) return;
+function exportCurrent() {
     const params = new URLSearchParams();
-    groups.forEach(g => params.append('groups', g));
+    const eventId = '{{ selected_event_id or "" }}';
+    const baseId  = '{{ selected_base_id or "" }}';
+    if (eventId) params.set('event_id', eventId);
+    if (baseId)  params.set('base_id',  baseId);
     window.location.href = '{{ url_for("balizamento.export_xlsx") }}?' + params.toString();
 }
-
-// Init
-document.addEventListener('DOMContentLoaded', function() {
-    updateExportButton();
-});
 </script>
 {% endblock %}

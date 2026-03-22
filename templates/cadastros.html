@@ -429,20 +429,25 @@
                 <span class="count-pill">{{ groups | length }}</span>
             </div>
             {% if groups %}
-            <div style="padding:8px 0;">
+            <div>
                 {% for g in groups %}
                 {% set cnt = turma_student_counts.get(g.id, 0) %}
-                <div id="group-row-{{ g.id }}" style="display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--border); transition:background .15s;"
-                     onmouseover="this.style.background='var(--bg-hover,rgba(255,255,255,.04))'" onmouseout="this.style.background=''">
-                    <div style="flex:1;">
-                        <div style="display:flex; align-items:center; gap:10px;">
+                {% set base_students = students | selectattr('group_id', 'equalto', g.id) | list %}
+                <div id="group-row-{{ g.id }}" style="border-bottom:1px solid var(--border);">
+
+                    <!-- ── Cabeçalho clicável ── -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 20px; cursor:pointer; transition:background .15s;"
+                         onclick="toggleBaseStudents({{ g.id }}, {{ cnt }})"
+                         onmouseover="this.style.background='var(--bg-hover,rgba(255,255,255,.04))'"
+                         onmouseout="this.style.background=''">
+                        <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
                             <div style="width:36px; height:36px; border-radius:8px; background:var(--accent); opacity:.15; flex-shrink:0;"></div>
                             <div style="margin-left:-36px; width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">📋</div>
-                            <div>
-                                <div id="g-name-{{ g.id }}" style="font-weight:600; font-size:14px;">{{ g.name }}</div>
+                            <div style="min-width:0;">
+                                <div id="g-name-{{ g.id }}" style="font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ g.name }}</div>
                                 <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
                                     {% if cnt == 0 %}
-                                        <span style="color:var(--text-muted);">Nenhum aluno cadastrado</span>
+                                        <span>Nenhum aluno cadastrado</span>
                                     {% elif cnt == 1 %}
                                         <span style="color:var(--accent);">1 aluno</span>
                                     {% else %}
@@ -452,18 +457,68 @@
                                 </div>
                             </div>
                         </div>
+                        <div style="display:inline-flex; gap:4px; align-items:center; flex-shrink:0;" onclick="event.stopPropagation()">
+                            {% if cnt > 0 %}
+                            <button class="btn btn-ghost btn-sm" id="toggle-btn-{{ g.id }}"
+                                    onclick="toggleBaseStudents({{ g.id }}, {{ cnt }})"
+                                    style="font-size:12px; gap:4px;">
+                                <span id="toggle-icon-{{ g.id }}">▼</span> Ver alunos
+                            </button>
+                            {% endif %}
+                            <button class="btn btn-ghost btn-sm btn-icon" title="Renomear base"
+                                onclick="openEditGroup({{ g.id }}, '{{ g.name | replace("'", "\\'") }}')">
+                                ✏️
+                            </button>
+                            <button class="btn btn-danger btn-sm btn-icon" title="Remover base"
+                                onclick="confirmDelete('{{ url_for('cadastros.delete_group', group_id=g.id) }}', 'group-row-{{ g.id }}', '{{ g.name | replace("'", "\\'") }}')">
+                                🗑️
+                            </button>
+                        </div>
                     </div>
-                    <div style="display:inline-flex; gap:4px; align-items:center;">
-                        <span class="count-pill" style="font-size:13px; {% if cnt == 0 %}opacity:0.4;{% endif %}">{{ cnt }}</span>
-                        <button class="btn btn-ghost btn-sm btn-icon" title="Renomear base"
-                            onclick="openEditGroup({{ g.id }}, '{{ g.name | replace("'", "\\'") }}')">
-                            ✏️
-                        </button>
-                        <button class="btn btn-danger btn-sm btn-icon" title="Remover base"
-                            onclick="confirmDelete('{{ url_for('cadastros.delete_group', group_id=g.id) }}', 'group-row-{{ g.id }}', '{{ g.name | replace("'", "\\'") }}')">
-                            🗑️
-                        </button>
+
+                    <!-- ── Painel expansível de alunos ── -->
+                    <div id="base-students-{{ g.id }}" style="display:none; border-top:1px solid var(--border); background:var(--bg-card);">
+                        {% if base_students %}
+                        <!-- Toolbar de busca rápida -->
+                        <div style="padding:10px 20px 8px; display:flex; align-items:center; gap:10px;">
+                            <div class="search-bar" style="flex:1; max-width:320px;">
+                                <span class="search-icon">🔍</span>
+                                <input type="text" placeholder="Buscar aluno..."
+                                       oninput="filterBaseStudents({{ g.id }}, this.value)"
+                                       autocomplete="off" style="font-size:13px;" />
+                            </div>
+                            <span style="font-size:12px; color:var(--text-muted);" id="base-count-{{ g.id }}">{{ cnt }} aluno(s)</span>
+                        </div>
+                        <div class="table-wrapper" style="border:none; border-radius:0; max-height:340px; overflow-y:auto;">
+                            <table id="base-table-{{ g.id }}">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Matrícula</th>
+                                        <th>Ano</th>
+                                        <th>Sala</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for s in base_students | sort(attribute='school_year') %}
+                                    <tr data-name="{{ s.full_name | lower }}" data-reg="{{ s.registration | lower }}">
+                                        <td><strong>{{ s.full_name }}</strong></td>
+                                        <td style="color:var(--text-muted);">{{ s.registration }}</td>
+                                        <td><span class="badge badge-accent" style="font-size:11px;">{{ s.school_year }}</span></td>
+                                        <td style="color:var(--text-muted);">{{ s.classroom or '—' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div style="padding:24px; text-align:center; color:var(--text-muted); font-size:13px;">
+                            Nenhum aluno vinculado a esta base ainda.<br>
+                            <small>Cadastre alunos e selecione esta base ao criá-los.</small>
+                        </div>
+                        {% endif %}
                     </div>
+
                 </div>
                 {% endfor %}
             </div>
@@ -705,6 +760,30 @@ function autoCalcEditEvent() {
         const turmaLabel = groupId ? '' : ' (todas as bases)';
         hintEl.innerHTML = `✅ <strong>${count} alunos elegíveis${turmaLabel}</strong> → <strong>${series} série(s)</strong> × ${lanes} raias`;
     }
+}
+
+// ── Base student panel ───────────────────────────────────────────────
+function toggleBaseStudents(id, cnt) {
+    if (cnt === 0) return;
+    const panel   = document.getElementById(`base-students-${id}`);
+    const iconEl  = document.getElementById(`toggle-icon-${id}`);
+    const isOpen  = panel.style.display !== 'none';
+    panel.style.display = isOpen ? 'none' : 'block';
+    if (iconEl) iconEl.textContent = isOpen ? '▼' : '▲';
+}
+
+function filterBaseStudents(groupId, query) {
+    const q       = query.toLowerCase().trim();
+    const tbody   = document.querySelector(`#base-table-${groupId} tbody`);
+    const countEl = document.getElementById(`base-count-${groupId}`);
+    if (!tbody) return;
+    let visible = 0;
+    tbody.querySelectorAll('tr').forEach(row => {
+        const match = !q || row.dataset.name.includes(q) || row.dataset.reg.includes(q);
+        row.style.display = match ? '' : 'none';
+        if (match) visible++;
+    });
+    if (countEl) countEl.textContent = `${visible} aluno(s)`;
 }
 
 // ── Edit Group (Base) ─────────────────────────────────────────────────

@@ -9,7 +9,7 @@ import io
 from collections import defaultdict
 from flask import Blueprint, render_template, send_file, request
 from flask_login import login_required
-from models import Student, Event
+from models import Student, Event, Group
 from services.seeding import build_series, COMPETITION_GROUPS, YEAR_TO_GROUP
 
 balizamento_bp = Blueprint("balizamento", __name__)
@@ -43,23 +43,50 @@ SERIE_SEP_BG   = "0A1018"
 @balizamento_bp.route("/balizamento")
 @login_required
 def balizamento():
-    students = Student.query.order_by(Student.school_year, Student.full_name).all()
-    events   = Event.query.order_by(Event.name).all()
+    selected_event_id = request.args.get("event_id", type=int)
+    selected_base_id  = request.args.get("base_id",  type=int)
 
-    preview  = _build_preview(events, students)
-    has_data = bool(students and events)
+    all_events = Event.query.order_by(Event.name).all()
+    all_bases  = Group.query.order_by(Group.name).all()
 
-    # Stats per group for the UI
+    has_selection = bool(selected_event_id or selected_base_id)
+    preview     = {}
+    has_data    = False
     group_stats = {}
-    for group in COMPETITION_GROUPS:
-        years = _years_for_group(group)
-        group_stats[group] = {
-            "students": len([s for s in students if s.school_year in years]),
-            "events":   len([e for e in events if e.competition_group and group in [x.strip() for x in e.competition_group.split(",")] ]),
-        }
+    students    = []
+    events      = []
+
+    if has_selection:
+        # Filter students by base (if chosen)
+        sq = Student.query.order_by(Student.school_year, Student.full_name)
+        if selected_base_id:
+            sq = sq.filter_by(group_id=selected_base_id)
+        students = sq.all()
+
+        # Filter events by id (if chosen)
+        events = all_events
+        if selected_event_id:
+            events = [e for e in all_events if e.id == selected_event_id]
+
+        preview  = _build_preview(events, students)
+        has_data = bool(students and events)
+
+        for group in COMPETITION_GROUPS:
+            years = _years_for_group(group)
+            group_stats[group] = {
+                "students": len([s for s in students if s.school_year in years]),
+                "events":   len([e for e in events
+                                 if e.competition_group and
+                                 group in [x.strip() for x in e.competition_group.split(",")]]),
+            }
 
     return render_template(
         "balizamento.html",
+        all_events=all_events,
+        all_bases=all_bases,
+        selected_event_id=selected_event_id,
+        selected_base_id=selected_base_id,
+        has_selection=has_selection,
         students=students,
         events=events,
         preview=preview,
@@ -77,24 +104,21 @@ def export_xlsx():
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
-    selected_groups = request.args.getlist("groups")  # multi-group selection
-    selected_group  = request.args.get("group")       # legacy single-group
-    selected_events = request.args.get("events")      # optional comma-sep event IDs
+    event_id = request.args.get("event_id", type=int)
+    base_id  = request.args.get("base_id",  type=int)
 
-    students = Student.query.order_by(Student.school_year, Student.full_name).all()
-    events   = Event.query.order_by(Event.name).all()
+    # Filter students
+    sq = Student.query.order_by(Student.school_year, Student.full_name)
+    if base_id:
+        sq = sq.filter_by(group_id=base_id)
+    students = sq.all()
 
-    # Filter events if requested
-    if selected_events:
-        try:
-            ev_ids = {int(x) for x in selected_events.split(",")}
-            events = [e for e in events if e.id in ev_ids]
-        except ValueError:
-            pass
-    elif selected_groups:
-        events = [e for e in events if e.competition_group and any(g.strip() in selected_groups for g in e.competition_group.split(","))]
-    elif selected_group:
-        events = [e for e in events if e.competition_group and selected_group in [g.strip() for g in e.competition_group.split(",")]]
+    # Filter events
+    all_events = Event.query.order_by(Event.name).all()
+    if event_id:
+        events = [e for e in all_events if e.id == event_id]
+    else:
+        events = all_events
 
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
@@ -103,13 +127,9 @@ def export_xlsx():
     for ev in events:
         if ev.competition_group:
             for g in ev.competition_group.split(","):
-                g = g.strip()
-                if selected_groups and g not in selected_groups: continue
-                if selected_group and g != selected_group: continue
-                grouped[g].append(ev)
+                grouped[g.strip()].append(ev)
         else:
-            if not selected_groups and not selected_group:
-                grouped["Sem Grupo"].append(ev)
+            grouped["Sem Grupo"].append(ev)
 
     sheet_order = [g for g in COMPETITION_GROUPS if g in grouped]
     if "Sem Grupo" in grouped:
@@ -126,20 +146,20 @@ def export_xlsx():
         ws.sheet_properties.tabColor = tab_colour
 
         # ── Styles ──────────────────────────────────────────────────
-        header_fill   = PatternFill("solid", fgColor=HEADER_BG)
-        accent_fill   = PatternFill("solid", fgColor=tab_colour)
-        odd_fill      = PatternFill("solid", fgColor=ODD_ROW_BG)
-        even_fill     = PatternFill("solid", fgColor=EVEN_ROW_BG)
-        serie_hdr_bg  = SERIE_HEADER_COLOURS.get(group_name, "0D1828")
+        header_fill    = PatternFill("solid", fgColor=HEADER_BG)
+        accent_fill    = PatternFill("solid", fgColor=tab_colour)
+        odd_fill       = PatternFill("solid", fgColor=ODD_ROW_BG)
+        even_fill      = PatternFill("solid", fgColor=EVEN_ROW_BG)
+        serie_hdr_bg   = SERIE_HEADER_COLOURS.get(group_name, "0D1828")
         serie_hdr_fill = PatternFill("solid", fgColor=serie_hdr_bg)
-        sep_fill      = PatternFill("solid", fgColor=SERIE_SEP_BG)
+        sep_fill       = PatternFill("solid", fgColor=SERIE_SEP_BG)
 
-        h_font_base  = Font(bold=True, color=ACCENT_FG, size=10)
-        h_font_time  = Font(bold=True, color=HEADER_FG, size=10)
-        data_font    = Font(color=HEADER_FG, size=10)
-        serie_font   = Font(bold=True, color=ACCENT_FG, size=9, italic=True)
-        center       = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        left_align   = Alignment(horizontal="left",   vertical="center")
+        h_font_base = Font(bold=True, color=ACCENT_FG, size=10)
+        h_font_time = Font(bold=True, color=HEADER_FG, size=10)
+        data_font   = Font(color=HEADER_FG, size=10)
+        serie_font  = Font(bold=True, color=ACCENT_FG, size=9, italic=True)
+        center      = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        left_align  = Alignment(horizontal="left",   vertical="center")
 
         thin = Border(
             bottom=Side(border_style="thin", color="2D3748"),
@@ -176,8 +196,9 @@ def export_xlsx():
             ws.freeze_panes = ws.cell(row=current_row + 1, column=3)
             current_row += 1
 
-            # ── Seeded data rows (with serie separators) ─────────────
-            ev_students = [s for s in group_students if ev.group_id is None or s.group_id == ev.group_id]
+            # ── Seeded data rows ─────────────────────────────────────
+            ev_students = [s for s in group_students
+                           if ev.group_id is None or s.group_id == ev.group_id]
             all_series = build_series(ev, ev_students, event_group=group_name)
 
             for series_idx, series in enumerate(all_series, start=1):
@@ -193,11 +214,11 @@ def export_xlsx():
                 current_row += 1
 
                 for lane_idx, student in enumerate(series, start=1):
-                    row_fill  = odd_fill if (current_row % 2 == 0) else even_fill
-                    row_data  = [
+                    row_fill = odd_fill if (current_row % 2 == 0) else even_fill
+                    row_data = [
                         series_idx,
                         lane_idx,
-                        student.full_name   if student else "",
+                        student.full_name    if student else "",
                         student.registration if student else "",
                         student.school_year  if student else "",
                         student.classroom or "" if student else "",
@@ -215,7 +236,7 @@ def export_xlsx():
                     ws.row_dimensions[current_row].height = 22
                     current_row += 1
 
-                # ── Spacer between series (not after the last) ───────
+                # ── Spacer between series ────────────────────────────
                 if series_idx < len(all_series):
                     for col_idx in range(1, len(HEADER) + 1):
                         sep_cell      = ws.cell(row=current_row, column=col_idx)
@@ -235,15 +256,15 @@ def export_xlsx():
     wb.save(buf)
     buf.seek(0)
 
-    # Build a descriptive filename
-    if selected_groups and len(selected_groups) == 1:
-        safe_name = selected_groups[0].replace(" ", "_").replace("º", "").replace("°", "")
-        filename  = f"balizamento_{safe_name}.xlsx"
-    elif selected_group:
-        safe_name = selected_group.replace(" ", "_").replace("º", "").replace("°", "")
-        filename  = f"balizamento_{safe_name}.xlsx"
-    else:
-        filename = "balizamento_completo.xlsx"
+    # Build descriptive filename
+    parts = []
+    if event_id:
+        ev_name = next((e.name for e in all_events if e.id == event_id), str(event_id))
+        parts.append(ev_name.replace(" ", "_"))
+    if base_id:
+        base_name = next((b.name for b in Group.query.all() if b.id == base_id), str(base_id))
+        parts.append(base_name.replace(" ", "_").replace("–", "-"))
+    filename = f"balizamento_{'_'.join(parts)}.xlsx" if parts else "balizamento_completo.xlsx"
 
     return send_file(
         buf,
@@ -269,9 +290,7 @@ def _build_preview(events, students):
                 grouped[key].append((ev, series_list))
         else:
             key = "Sem Grupo"
-            group_years = _years_for_group(key)
-            group_students = [s for s in students if s.school_year in group_years] if group_years else students
-            ev_students    = [s for s in group_students if ev.group_id is None or s.group_id == ev.group_id]
+            ev_students = [s for s in students if ev.group_id is None or s.group_id == ev.group_id]
             series_list = build_series(ev, ev_students, event_group=key)
             grouped[key].append((ev, series_list))
     return dict(grouped)
