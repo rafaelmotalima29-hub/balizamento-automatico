@@ -46,10 +46,6 @@ def register():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard.index"))
 
-    if _has_users():
-        flash("Cadastro desabilitado. Já existe um usuário registrado.", "warning")
-        return redirect(url_for("auth.login"))
-
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
@@ -69,6 +65,10 @@ def register():
 
         if password != confirm:
             flash("As senhas não coincidem.", "error")
+            return render_template("register.html")
+
+        if User.query.filter_by(username=username).first():
+            flash("Este nome de usuário já está em uso.", "error")
             return render_template("register.html")
 
         user = User(username=username)
