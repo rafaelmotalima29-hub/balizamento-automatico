@@ -23,28 +23,37 @@ def index():
         .all()
     )
 
+    from sqlalchemy.orm import contains_eager
+
     # ── Results per event → corrida_num → school_year ───────────────────────
-    events = Event.query.order_by(Event.name).all()
-    event_results = {}
-    for event in events:
-        by_corrida = {}
-        results = (
-            Result.query
-            .filter_by(event_id=event.id)
-            .join(Student)
-            .order_by(
-                Result.corrida_num.asc(),
-                Student.school_year,
-                Result.placement.asc().nullslast(),
-                Result.total_time.asc().nullslast(),
-            )
-            .all()
+    # We pre-fill the dictionary with all events so even empty events show up
+    all_events = Event.query.order_by(Event.name).all()
+    event_results = {e: {} for e in all_events}
+
+    # Fetch ALL results in a single heavily optimized query
+    all_results = (
+        Result.query
+        .join(Result.student)
+        .join(Result.event)
+        .options(contains_eager(Result.student), contains_eager(Result.event))
+        .order_by(
+            Event.name.asc(),
+            Result.corrida_num.asc(),
+            Student.school_year.asc(),
+            Result.placement.asc().nullslast(),
+            Result.total_time.asc().nullslast(),
         )
-        for r in results:
-            c_key = r.corrida_num or 1
-            sy = r.student.school_year
-            by_corrida.setdefault(c_key, {}).setdefault(sy, []).append(r)
-        event_results[event] = by_corrida
+        .all()
+    )
+
+    for r in all_results:
+        evt = r.event
+        if evt not in event_results:
+            event_results[evt] = {}
+        
+        c_key = r.corrida_num or 1
+        sy = r.student.school_year
+        event_results[evt].setdefault(c_key, {}).setdefault(sy, []).append(r)
 
     has_results = Result.query.count() > 0
 

@@ -267,7 +267,7 @@ a:hover { color: var(--accent-hover); }
 .stat-card:hover { border-color: var(--border-accent); transform: translateY(-2px); }
 .stat-icon { font-size: 32px; flex-shrink: 0; }
 .stat-info { flex: 1; }
-.stat-value { font-size: 28px; font-weight: 800; color: var(--text-primary); line-height: 1; }
+.stat-value { font-size: 28px; font-weight: 800; color: var(--text-primary); line-height: 1; letter-spacing: -0.03em; }
 .stat-label {
   font-size: 12px; color: var(--text-muted); margin-top: 4px;
   font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em;
@@ -298,7 +298,7 @@ a:hover { color: var(--accent-hover); }
 .rank-badge.silver { background: rgba(168,178,193,0.2); color: var(--silver); }
 .rank-badge.bronze { background: rgba(205,127,50,0.2);  color: var(--bronze); }
 .rank-team { flex: 1; font-weight: 700; font-size: 15px; }
-.rank-points { font-size: 22px; font-weight: 800; color: var(--accent); }
+.rank-points { font-size: 22px; font-weight: 800; color: var(--accent); letter-spacing: -0.02em; }
 .rank-pts-label { font-size: 11px; color: var(--text-muted); }
 
 /* ═══════════════════════════════════════════
@@ -399,7 +399,7 @@ tbody tr.deleting {
   color: var(--text-secondary);
   transition: all var(--transition);
   white-space: nowrap;
-  min-height: 32px;
+  min-height: 44px;
 }
 .filter-pill:hover { border-color: var(--border-accent); color: var(--text-primary); }
 .filter-pill.active {
@@ -531,9 +531,9 @@ input::placeholder { color: var(--text-muted); }
   border: 1px solid rgba(248,81,73,0.25);
 }
 .btn-danger:hover { background: rgba(248,81,73,0.22); }
-.btn-sm { padding: 7px 14px; font-size: 12px; min-height: 34px; }
+.btn-sm { padding: 7px 14px; font-size: 12px; min-height: 44px; }
 .btn-lg { padding: 14px 28px; font-size: 16px; }
-.btn-icon { padding: 8px; border-radius: var(--radius-sm); min-width: 38px; min-height: 38px; }
+.btn-icon { padding: 8px; border-radius: var(--radius-sm); min-width: 44px; min-height: 44px; }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* ═══════════════════════════════════════════
@@ -694,7 +694,7 @@ input::placeholder { color: var(--text-muted); }
   font-size: 13px;
 }
 .metric-icon { font-size: 16px; }
-.metric-value { font-size: 20px; font-weight: 800; color: var(--text-primary); line-height: 1; }
+.metric-value { font-size: 20px; font-weight: 800; color: var(--text-primary); line-height: 1; letter-spacing: -0.02em; }
 .metric-label { font-size: 11px; color: var(--text-muted); font-weight: 600;
                 text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
 .metric-sep {

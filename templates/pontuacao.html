@@ -53,6 +53,7 @@
               max="9999"
               data-placement="{{ row.placement }}"
               style="width:100px;"
+              aria-label="Pontos para o {{ row.placement }}º lugar"
             />
           </td>
           <td>
@@ -224,7 +225,7 @@
         <input type="number" class="input points-input"
           value="${row.points}" min="0" max="9999"
           data-placement="${row.placement}"
-          style="width:100px;" />
+          style="width:100px;" aria-label="Pontos para o ${row.placement}º lugar" />
       </td>
       <td>
         <button class="btn-icon btn-delete" title="Remover colocação"

@@ -11,7 +11,7 @@
     <!-- Drop Zone -->
     <form method="POST" action="{{ url_for('upload.process') }}" enctype="multipart/form-data" id="upload-form">
 
-        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <label class="drop-zone" id="drop-zone" for="file-input">
             <span class="drop-icon" id="drop-icon">☁️</span>
             <div class="drop-title" id="drop-title">Arraste seu arquivo aqui</div>
             <div class="drop-sub">ou clique para selecionar — CSV, XLS ou XLSX</div>
@@ -20,7 +20,7 @@
                 <span id="file-name"></span>
             </div>
             <input type="file" id="file-input" name="file" accept=".csv,.xlsx,.xls" required />
-        </div>
+        </label>
 
         <button type="submit" class="btn btn-primary btn-lg" id="upload-btn"
             style="width: 100%; margin-top: 16px; display: none;">

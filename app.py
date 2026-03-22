@@ -30,6 +30,8 @@ def _migrate_db(db):
         ("events",   "num_series",          "INTEGER NOT NULL DEFAULT 1"),
         ("events",   "athletes_per_series", "INTEGER NOT NULL DEFAULT 8"),
         ("results",  "is_dq",              "BOOLEAN NOT NULL DEFAULT FALSE"),
+        ("events",   "group_id",           "INTEGER"),
+        ("students", "group_id",           "INTEGER"),
     ]
 
     is_postgres = "postgresql" in db.engine.url.drivername
