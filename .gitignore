@@ -33,7 +33,6 @@ uploads/*
 .env
 
 # Agent/Antigravity
-.agent/
 .gemini/
 
 # OS
