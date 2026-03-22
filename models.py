@@ -4,6 +4,19 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from extensions import db
 
 
+class Group(db.Model):
+    """
+    Grupo/Turma ao qual um aluno pode pertencer ou que uma prova pode restringir.
+    """
+    __tablename__ = "groups"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    def __repr__(self):
+        return f"<Group {self.name}>"
+
 class User(UserMixin, db.Model):
     """Application user for authentication."""
     __tablename__ = "users"
@@ -45,9 +58,11 @@ class Student(db.Model):
     registration = db.Column(db.String(50), nullable=False, unique=True)
     school_year = db.Column(db.String(50), nullable=False)
     classroom = db.Column(db.String(20), nullable=True)  # Sala (ex: 6A, 7B)
+    group_id = db.Column(db.Integer, db.ForeignKey("groups.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     results = db.relationship("Result", backref="student", lazy=True, cascade="all, delete-orphan")
+    group = db.relationship("Group", backref="students", lazy=True)
 
     def __repr__(self):
         return f"<Student {self.full_name} – {self.school_year}>"
@@ -62,9 +77,11 @@ class Event(db.Model):
     competition_group = db.Column(db.String(50), nullable=True)  # ex: "6º e 7º Ano"
     num_series = db.Column(db.Integer, nullable=False, default=1)   # number of heats/bateries
     athletes_per_series = db.Column(db.Integer, nullable=False, default=8)  # lanes per heat
+    group_id = db.Column(db.Integer, db.ForeignKey("groups.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     results = db.relationship("Result", backref="event", lazy=True, cascade="all, delete-orphan")
+    group = db.relationship("Group", backref="events", lazy=True)
 
     def __repr__(self):
         return f"<Event {self.name} ({self.competition_group})>"

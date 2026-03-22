@@ -177,7 +177,8 @@ def export_xlsx():
             current_row += 1
 
             # ── Seeded data rows (with serie separators) ─────────────
-            all_series = build_series(ev, group_students, event_group=group_name)
+            ev_students = [s for s in group_students if ev.group_id is None or s.group_id == ev.group_id]
+            all_series = build_series(ev, ev_students, event_group=group_name)
 
             for series_idx, series in enumerate(all_series, start=1):
                 # ── Serie header row ─────────────────────────────────
@@ -263,13 +264,15 @@ def _build_preview(events, students):
                 key = g.strip()
                 group_years    = _years_for_group(key)
                 group_students = [s for s in students if s.school_year in group_years] if group_years else students
-                series_list    = build_series(ev, group_students, event_group=key)
+                ev_students    = [s for s in group_students if ev.group_id is None or s.group_id == ev.group_id]
+                series_list    = build_series(ev, ev_students, event_group=key)
                 grouped[key].append((ev, series_list))
         else:
             key = "Sem Grupo"
             group_years = _years_for_group(key)
             group_students = [s for s in students if s.school_year in group_years] if group_years else students
-            series_list = build_series(ev, group_students, event_group=key)
+            ev_students    = [s for s in group_students if ev.group_id is None or s.group_id == ev.group_id]
+            series_list = build_series(ev, ev_students, event_group=key)
             grouped[key].append((ev, series_list))
     return dict(grouped)
 

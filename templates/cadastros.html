@@ -38,6 +38,9 @@
     <button class="tab-btn" onclick="switchTab('provas', this)">
         🏁 Provas <span class="count-pill">{{ events | length }}</span>
     </button>
+    <button class="tab-btn" onclick="switchTab('grupos', this)">
+        👥 Turmas <span class="count-pill">{{ groups | length }}</span>
+    </button>
 </div>
 
 <!-- ══════════════════════════════════════════
@@ -82,6 +85,15 @@
                         <option>1º Ano Médio</option>
                         <option>2º Ano Médio</option>
                         <option>3º Ano Médio</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="group_id">Turma</label>
+                    <select id="group_id" name="group_id">
+                        <option value="">Sem Turma</option>
+                        {% for g in groups %}
+                        <option value="{{ g.id }}">{{ g.name }}</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <button type="submit" class="btn btn-primary" style="width:100%;">
@@ -146,6 +158,7 @@
                             <th>Nome</th>
                             <th>Matrícula</th>
                             <th>Sala</th>
+                            <th>Turma</th>
                             <th>Equipe</th>
                             <th style="text-align:right; width:80px;"></th>
                         </tr>
@@ -223,6 +236,15 @@
                         {% endfor %}
                     </div>
                 </div>
+                <div class="form-group">
+                    <label for="event_group_id">Restrito à Turma (Opcional)</label>
+                    <select id="event_group_id" name="group_id">
+                        <option value="">Qualquer Turma (Aberto)</option>
+                        {% for g in groups %}
+                        <option value="{{ g.id }}">{{ g.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="num_series">Nº de Séries</label>
@@ -288,7 +310,8 @@
                     <thead>
                         <tr>
                             <th>Nome da Prova</th>
-                            <th>Grupo</th>
+                            <th>Grupos Idade</th>
+                            <th>Turma Restrita</th>
                             <th>Séries</th>
                             <th>Raias</th>
                             <th style="text-align:right; width:80px;"></th>
@@ -334,6 +357,71 @@
     </div>
 </div>
 
+
+<!-- ══════════════════════════════════════════
+     TAB: GRUPOS
+══════════════════════════════════════════ -->
+<div class="tab-pane" id="pane-grupos">
+    <div class="cadastro-layout">
+        <div class="card cadastro-form-col">
+            <div class="card-header">
+                <div class="card-title">➕ Cadastrar Turma</div>
+            </div>
+            <form method="POST" action="{{ url_for('cadastros.add_group') }}">
+                <div class="form-group">
+                    <label for="group_name">Nome da Turma</label>
+                    <input type="text" id="group_name" name="name"
+                           placeholder="ex: Turma da Manhã, SESI" required autocomplete="off" />
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">
+                    Cadastrar Turma
+                </button>
+            </form>
+        </div>
+
+        <div class="card cadastro-list-col" style="padding:0; overflow:hidden;">
+            <div class="card-header" style="padding:16px 20px;">
+                <div class="card-title">👥 Turmas Cadastradas</div>
+            </div>
+            {% if groups %}
+            <div class="table-wrapper" style="border:none; border-radius:0;">
+                <table id="groups-table">
+                    <thead>
+                        <tr>
+                            <th>Nome da Turma</th>
+                            <th>Data de Criação</th>
+                            <th style="text-align:right; width:80px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="groups-tbody">
+                        {% for g in groups %}
+                        <tr id="group-row-{{ g.id }}">
+                            <td id="g-name-{{ g.id }}"><strong>{{ g.name }}</strong></td>
+                            <td style="color:var(--text-muted);">{{ g.created_at.strftime('%d/%m/%Y') if g.created_at else '—' }}</td>
+                            <td style="text-align:right;">
+                                <div style="display:inline-flex; gap:4px;">
+                                    <button class="btn btn-danger btn-sm btn-icon" title="Remover turma"
+                                        onclick="confirmDelete('{{ url_for('cadastros.delete_group', group_id=g.id) }}', 'group-row-{{ g.id }}', '{{ g.name | replace("'", "\'") }}')">
+                                        🗑️
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding:48px;">
+                <span class="empty-state-icon">👥</span>
+                <h3>Nenhuma Turma</h3>
+                <p>Cadastre as turmas para organizar seus alunos.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
 <!-- ══════════════════════════════════════════
      EDIT STUDENT MODAL
 ══════════════════════════════════════════ -->
@@ -374,6 +462,15 @@
                 <option>3º Ano Médio</option>
             </select>
         </div>
+        <div class="form-group">
+            <label for="edit-student-group">Turma (Opcional)</label>
+            <select id="edit-student-group">
+                <option value="">Sem Turma</option>
+                {% for g in groups %}
+                <option value="{{ g.id }}">{{ g.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
         <div id="edit-student-error" class="edit-modal-error" style="display:none;"></div>
         <div class="modal-actions" style="margin-top:8px;">
             <button class="btn btn-ghost" onclick="closeModal('edit-student-modal')">Cancelar</button>
@@ -411,6 +508,15 @@
                 </label>
                 {% endfor %}
             </div>
+        </div>
+        <div class="form-group">
+            <label for="edit-event-group">Restrito à Turma (Opcional)</label>
+            <select id="edit-event-group">
+                <option value="">Qualquer Turma (Aberto)</option>
+                {% for g in groups %}
+                <option value="{{ g.id }}">{{ g.name }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="form-row">
             <div class="form-group">
@@ -484,12 +590,13 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Edit Student ─────────────────────────────────────────────────────
-function openEditStudent(id, name, registration, year, classroom) {
+function openEditStudent(id, name, registration, year, classroom, groupId) {
     document.getElementById('edit-student-id').value       = id;
     document.getElementById('edit-student-name').value     = name;
     document.getElementById('edit-student-reg').value      = registration;
     document.getElementById('edit-student-year').value     = year;
     document.getElementById('edit-student-class').value    = classroom;
+    document.getElementById('edit-student-group').value    = groupId || '';
     document.getElementById('edit-student-subtitle').textContent = `Matrícula: ${registration}`;
     document.getElementById('edit-student-error').style.display = 'none';
     document.getElementById('edit-student-modal').classList.add('active');
@@ -502,6 +609,7 @@ async function submitEditStudent() {
     const registration = document.getElementById('edit-student-reg').value.trim();
     const school_year = document.getElementById('edit-student-year').value;
     const classroom   = document.getElementById('edit-student-class').value.trim();
+    const group_id    = document.getElementById('edit-student-group').value;
     const errEl       = document.getElementById('edit-student-error');
     const saveBtn     = document.getElementById('edit-student-save');
 
@@ -520,7 +628,7 @@ async function submitEditStudent() {
         const res  = await fetch(`/cadastros/aluno/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ full_name, registration, school_year, classroom }),
+            body: JSON.stringify({ full_name, registration, school_year, classroom, group_id }),
         });
         const data = await res.json();
 
@@ -535,11 +643,12 @@ async function submitEditStudent() {
                 document.getElementById(`s-name-${id}`).innerHTML  = `<strong>${escHtml(s.full_name)}</strong>`;
                 document.getElementById(`s-reg-${id}`).textContent  = s.registration;
                 document.getElementById(`s-class-${id}`).textContent = s.classroom || '—';
+                if(document.getElementById(`s-group-${id}`)) document.getElementById(`s-group-${id}`).textContent = s.group_name || '—';
                 document.getElementById(`s-year-${id}`).innerHTML  =
                     `<span class="badge badge-accent">${escHtml(s.school_year)}</span>`;
                 // Re-wire edit button
                 row.querySelector('.btn-ghost').setAttribute('onclick',
-                    `openEditStudent(${s.id}, '${s.full_name.replace(/'/g,"\\'")}', '${s.registration}', '${s.school_year}', '${s.classroom}')`);
+                    `openEditStudent(${s.id}, '${s.full_name.replace(/'/g,"\\'")}', '${s.registration}', '${s.school_year}', '${s.classroom}', '${s.group_id || ''}')`);
             }
             closeModal('edit-student-modal');
             showToast(`"${s.full_name}" atualizado com sucesso.`, 'success');
@@ -557,13 +666,14 @@ async function submitEditStudent() {
 }
 
 // ── Edit Event ───────────────────────────────────────────────────────
-function openEditEvent(id, name, group, numSeries, lanes) {
+function openEditEvent(id, name, group, numSeries, lanes, groupId) {
     document.getElementById('edit-event-id').value      = id;
     document.getElementById('edit-event-name').value    = name;
     const currentGroups = group ? group.split(',').map(g => g.trim()) : [];
     document.querySelectorAll('.edit-group-cb').forEach(cb => {
         cb.checked = currentGroups.includes(cb.value);
     });
+    document.getElementById('edit-event-group').value   = groupId || '';
     document.getElementById('edit-event-series').value  = numSeries;
     document.getElementById('edit-event-lanes').value   = lanes;
     document.getElementById('edit-event-subtitle').textContent = `${numSeries} série(s) × ${lanes} raias`;
@@ -576,6 +686,7 @@ async function submitEditEvent() {
     const id                 = document.getElementById('edit-event-id').value;
     const name               = document.getElementById('edit-event-name').value.trim();
     const competition_group  = Array.from(document.querySelectorAll('.edit-group-cb:checked')).map(cb => cb.value).join(',');
+    const group_id           = document.getElementById('edit-event-group').value;
     const num_series         = parseInt(document.getElementById('edit-event-series').value) || 1;
     const athletes_per_series = parseInt(document.getElementById('edit-event-lanes').value) || 8;
     const errEl              = document.getElementById('edit-event-error');
@@ -596,7 +707,7 @@ async function submitEditEvent() {
         const res  = await fetch(`/cadastros/prova/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, competition_group, num_series, athletes_per_series }),
+            body: JSON.stringify({ name, competition_group, num_series, athletes_per_series, group_id }),
         });
         const data = await res.json();
 
@@ -608,11 +719,13 @@ async function submitEditEvent() {
                 document.getElementById(`e-name-${id}`).innerHTML  = `<strong>${escHtml(e.name)}</strong>`;
                 document.getElementById(`e-group-${id}`).innerHTML =
                     `<span class="badge badge-accent" style="font-size:11px;">${escHtml(e.competition_group || '—')}</span>`;
+                if(document.getElementById(`e-restricted-group-${id}`)) document.getElementById(`e-restricted-group-${id}`).innerHTML = 
+                    `<span style="font-size:12px; color:var(--text-muted);">${e.group_name || 'Aberto'}</span>`;
                 document.getElementById(`e-series-${id}`).textContent = `${e.num_series}×`;
                 document.getElementById(`e-lanes-${id}`).textContent  = e.athletes_per_series;
                 // Re-wire edit button
                 row.querySelector('.btn-ghost').setAttribute('onclick',
-                    `openEditEvent(${e.id}, '${e.name.replace(/'/g,"\\'")}', '${e.competition_group}', ${e.num_series}, ${e.athletes_per_series})`);
+                    `openEditEvent(${e.id}, '${e.name.replace(/'/g,"\\'")}', '${e.competition_group}', ${e.num_series}, ${e.athletes_per_series}, '${e.group_id || ''}')`);
             }
             closeModal('edit-event-modal');
             showToast(`Prova "${e.name}" atualizada com sucesso.`, 'success');

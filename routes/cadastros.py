@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required
 from extensions import db
-from models import Student, Event
+from models import Student, Event, Group
 from services.seeding import COMPETITION_GROUPS, YEAR_TO_GROUP
 from collections import defaultdict
 
@@ -18,6 +18,7 @@ for _y, _g in YEAR_TO_GROUP.items():
 def cadastros():
     students = Student.query.order_by(Student.school_year, Student.full_name).all()
     events   = Event.query.order_by(Event.name).all()
+    groups   = Group.query.order_by(Group.name).all()
 
     # ── Metrics ──────────────────────────────────────────────────────
     # Students per year
@@ -44,6 +45,7 @@ def cadastros():
         "cadastros.html",
         students=students,
         events=events,
+        groups=groups,
         competition_groups=COMPETITION_GROUPS,
         year_counts=dict(year_counts),
         group_student_counts=group_student_counts,
@@ -60,6 +62,7 @@ def add_student():
     registration = request.form.get("registration", "").strip()
     school_year  = request.form.get("school_year", "").strip()
     classroom    = request.form.get("classroom", "").strip() or None
+    group_id     = request.form.get("group_id", "").strip() or None
 
     if not all([full_name, registration, school_year]):
         flash("Preencha todos os campos obrigatórios do aluno.", "error")
@@ -75,6 +78,7 @@ def add_student():
         registration=registration,
         school_year=school_year,
         classroom=classroom,
+        group_id=int(group_id) if group_id else None,
     )
     db.session.add(student)
     db.session.commit()
@@ -92,6 +96,8 @@ def edit_student(student_id):
     registration = data.get("registration", "").strip()
     school_year  = data.get("school_year", "").strip()
     classroom    = data.get("classroom", "").strip() or None
+    group_id     = data.get("group_id", "")
+    group_id     = int(group_id) if group_id else None
 
     if not all([full_name, registration, school_year]):
         return jsonify({"error": "Preencha todos os campos obrigatórios."}), 400
@@ -107,6 +113,7 @@ def edit_student(student_id):
     student.registration = registration
     student.school_year  = school_year
     student.classroom    = classroom
+    student.group_id     = group_id
     db.session.commit()
 
     return jsonify({
@@ -117,6 +124,8 @@ def edit_student(student_id):
             "registration": student.registration,
             "school_year":  student.school_year,
             "classroom":    student.classroom or "",
+            "group_id":     student.group_id,
+            "group_name":   student.group.name if student.group else "",
         },
     })
 
@@ -138,6 +147,7 @@ def add_event():
     name              = request.form.get("name", "").strip()
     groups = request.form.getlist("competition_group")
     competition_group = ",".join(g.strip() for g in groups if g.strip()) or None
+    group_id          = request.form.get("group_id", "").strip() or None
     try:
         num_corridas = max(1, min(10, int(request.form.get("num_corridas", 1))))
     except (ValueError, TypeError):
@@ -166,6 +176,7 @@ def add_event():
         competition_group=competition_group,
         num_series=num_series,
         athletes_per_series=athletes_per_series,
+        group_id=int(group_id) if group_id else None,
     )
     db.session.add(event)
     db.session.commit()
@@ -181,6 +192,8 @@ def edit_event(event_id):
 
     name              = data.get("name", "").strip()
     competition_group = data.get("competition_group", "").strip() or None
+    group_id          = data.get("group_id", "")
+    group_id          = int(group_id) if group_id else None
     try:
         num_series = max(1, min(50, int(data.get("num_series", 1))))
     except (ValueError, TypeError):
@@ -201,6 +214,7 @@ def edit_event(event_id):
     event.competition_group = competition_group
     event.num_series        = num_series
     event.athletes_per_series = athletes_per_series
+    event.group_id            = group_id
     db.session.commit()
 
     return jsonify({
@@ -211,6 +225,8 @@ def edit_event(event_id):
             "competition_group":  event.competition_group or "",
             "num_series":         event.num_series,
             "athletes_per_series": event.athletes_per_series,
+            "group_id":           event.group_id,
+            "group_name":         event.group.name if event.group else "",
         },
     })
 
@@ -222,3 +238,61 @@ def delete_event(event_id):
     db.session.delete(event)
     db.session.commit()
     return jsonify({"ok": True, "message": f"Prova '{event.name}' removida."})
+
+
+# ── Group CRUD ────────────────────────────────────────────────────────
+
+@cadastros_bp.route("/cadastros/grupo", methods=["POST"])
+@login_required
+def add_group():
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("Informe o nome do grupo.", "error")
+        return redirect(url_for("cadastros.cadastros"))
+
+    existing = Group.query.filter_by(name=name).first()
+    if existing:
+        flash(f"Grupo '{name}' já cadastrado.", "error")
+        return redirect(url_for("cadastros.cadastros"))
+
+    g = Group(name=name)
+    db.session.add(g)
+    db.session.commit()
+    flash(f"Grupo '{name}' cadastrado com sucesso!", "success")
+    return redirect(url_for("cadastros.cadastros"))
+
+
+@cadastros_bp.route("/cadastros/grupo/<int:group_id>", methods=["PUT"])
+@login_required
+def edit_group(group_id):
+    g = Group.query.get_or_404(group_id)
+    data = request.get_json(force=True) or {}
+    name = data.get("name", "").strip()
+
+    if not name:
+        return jsonify({"error": "Informe o nome do grupo."}), 400
+
+    dup = Group.query.filter(Group.name == name, Group.id != group_id).first()
+    if dup:
+        return jsonify({"error": f"Grupo '{name}' já está em uso."}), 409
+
+    g.name = name
+    db.session.commit()
+
+    return jsonify({
+        "ok": True,
+        "group": {
+            "id": g.id,
+            "name": g.name
+        }
+    })
+
+
+@cadastros_bp.route("/cadastros/grupo/<int:group_id>", methods=["DELETE"])
+@login_required
+def delete_group(group_id):
+    g = Group.query.get_or_404(group_id)
+    db.session.delete(g)
+    db.session.commit()
+    return jsonify({"ok": True, "message": f"Grupo '{g.name}' removido."})
+
