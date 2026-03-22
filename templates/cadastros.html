@@ -172,11 +172,12 @@
                             <td id="s-name-{{ s.id }}"><strong>{{ s.full_name }}</strong></td>
                             <td id="s-reg-{{ s.id }}" style="color:var(--text-muted);">{{ s.registration }}</td>
                             <td id="s-class-{{ s.id }}" style="color:var(--text-muted);">{{ s.classroom or '—' }}</td>
+                            <td id="s-group-{{ s.id }}" style="color:var(--text-muted);">{{ s.group.name if s.group else '—' }}</td>
                             <td id="s-year-{{ s.id }}"><span class="badge badge-accent">{{ s.school_year }}</span></td>
                             <td style="text-align:right;">
                                 <div style="display:inline-flex; gap:4px;">
                                     <button class="btn btn-ghost btn-sm btn-icon" title="Editar aluno"
-                                        onclick="openEditStudent({{ s.id }}, '{{ s.full_name | replace("'", "\\'") }}', '{{ s.registration }}', '{{ s.school_year }}', '{{ s.classroom or '' }}')">
+                                        onclick="openEditStudent({{ s.id }}, '{{ s.full_name | replace("'", "\\'") }}', '{{ s.registration }}', '{{ s.school_year }}', '{{ s.classroom or '' }}', '{{ s.group_id or '' }}')">
                                         ✏️
                                     </button>
                                     <button class="btn btn-danger btn-sm btn-icon" title="Remover aluno"
@@ -297,9 +298,9 @@
             <div class="list-toolbar" style="border-bottom:1px solid var(--border);">
                 <div class="filter-pills" id="event-group-pills">
                     <button class="filter-pill active" onclick="setEventGroup('all', this)">Todos</button>
-                    {% set groups = [] %}
-                    {% for e in events %}{% if e.competition_group and e.competition_group not in groups %}{% set _ = groups.append(e.competition_group) %}{% endif %}{% endfor %}
-                    {% for g in groups | sort %}
+                    {% set event_group_names = [] %}
+                    {% for e in events %}{% if e.competition_group and e.competition_group not in event_group_names %}{% set _ = event_group_names.append(e.competition_group) %}{% endif %}{% endfor %}
+                    {% for g in event_group_names | sort %}
                     <button class="filter-pill" onclick="setEventGroup('{{ g }}', this)">{{ g }}</button>
                     {% endfor %}
                 </div>
@@ -326,12 +327,13 @@
                                     {{ e.competition_group or '—' }}
                                 </span>
                             </td>
+                            <td id="e-tgroup-{{ e.id }}" style="color:var(--text-muted);">{{ e.group.name if e.group else 'Aberto' }}</td>
                             <td id="e-series-{{ e.id }}" style="color:var(--text-muted);">{{ e.num_series }}×</td>
                             <td id="e-lanes-{{ e.id }}" style="color:var(--text-muted);">{{ e.athletes_per_series }}</td>
                             <td style="text-align:right;">
                                 <div style="display:inline-flex; gap:4px;">
                                     <button class="btn btn-ghost btn-sm btn-icon" title="Editar prova"
-                                        onclick="openEditEvent({{ e.id }}, '{{ e.name | replace("'", "\\'") }}', '{{ e.competition_group or '' }}', {{ e.num_series }}, {{ e.athletes_per_series }})">
+                                        onclick="openEditEvent({{ e.id }}, '{{ e.name | replace("'", "\\'") }}', '{{ e.competition_group or '' }}', {{ e.num_series }}, {{ e.athletes_per_series }}, '{{ e.group_id or '' }}')">
                                         ✏️
                                     </button>
                                     <button class="btn btn-danger btn-sm btn-icon" title="Remover prova"
