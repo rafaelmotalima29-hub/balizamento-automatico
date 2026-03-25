@@ -134,6 +134,53 @@ def _merge_pools(pools, years):
     return merged
 
 
+def build_relay_series(
+    event,
+    students: list[Student],
+    event_group: Optional[str] = None
+) -> list[list[Optional[dict]]]:
+    """
+    Distribute school-year teams across lanes for a relay event.
+
+    Each lane holds one team = one school year.  Each team dict looks like:
+        {"year": "6º Ano", "students": [Student, ...]}
+
+    Returns a list of series; each series is a list of team-dict|None.
+    """
+    num_series = max(1, event.num_series or 1)
+    lanes_per_series = max(1, event.athletes_per_series or 8)
+    relay_size = event.relay_size or 4
+    group = event_group if event_group is not None else (event.competition_group or "")
+
+    # Bucket students by year
+    from collections import defaultdict, deque
+    buckets: dict[str, list[Student]] = defaultdict(list)
+    for s in students:
+        buckets[s.school_year].append(s)
+
+    # Build teams in display order (only years that have students)
+    group_years = [y for y in _year_order_for_group(group) if y in buckets]
+    teams = deque()
+    for year in group_years:
+        teams.append({
+            "year": year,
+            "students": buckets[year][:relay_size],  # first N students
+            "all_students": buckets[year],            # all eligible
+        })
+
+    all_series: list[list[Optional[dict]]] = []
+    for _ in range(num_series):
+        series: list[Optional[dict]] = []
+        for _ in range(lanes_per_series):
+            if teams:
+                series.append(teams.popleft())
+            else:
+                series.append(None)
+        all_series.append(series)
+
+    return all_series
+
+
 def _cycle(lst: list):
     """Infinite cycle over a list."""
     i = 0

@@ -154,21 +154,24 @@ def process_upload(filepath: str) -> dict:
 
     db.session.flush()
 
-    # ── 5. Rank within (event, school_year) ─────────────────────────
+    # ── 5. Rank within event (unified across all years) ──────────────
     points_table = _load_points_table()
-    student_map  = {s.id: s for s in Student.query.all()}
 
     groups = defaultdict(list)
     for row_data, res_obj in result_objs:
-        student = student_map.get(row_data["student_id"])
-        if student:
-            key = (row_data["event_id"], student.school_year)
-            groups[key].append((row_data, res_obj))
+        key = row_data["event_id"]
+        groups[key].append((row_data, res_obj))
+
+    # Build event lookup for relay multiplier
+    events_by_id = {e.id: e for e in Event.query.all()}
 
     for key, group in groups.items():
         valid = [(r, o) for r, o in group if not r["dq"]]
         disq  = [(r, o) for r, o in group if r["dq"]]
         valid.sort(key=lambda x: x[0]["total_time"])
+
+        event = events_by_id.get(key)
+        multiplier = 2 if (event and event.is_relay) else 1
 
         rank = 1
         for i, (row_data, res_obj) in enumerate(valid):
@@ -177,7 +180,7 @@ def process_upload(filepath: str) -> dict:
             else:
                 rank = i + 1
             res_obj.placement = rank
-            res_obj.points    = _assign_points(rank, points_table)
+            res_obj.points    = _assign_points(rank, points_table) * multiplier
 
         for _, res_obj in disq:
             res_obj.placement = None

@@ -32,6 +32,10 @@ def _migrate_db(db):
         ("results",  "is_dq",              "BOOLEAN NOT NULL DEFAULT FALSE"),
         ("events",   "group_id",           "INTEGER"),
         ("students", "group_id",           "INTEGER"),
+        ("students", "gender",             "VARCHAR(1)"),
+        ("events",   "gender",             "VARCHAR(10)"),
+        ("events",   "is_relay",           "BOOLEAN NOT NULL DEFAULT FALSE"),
+        ("events",   "relay_size",         "INTEGER"),
     ]
 
     is_postgres = "postgresql" in db.engine.url.drivername
@@ -117,6 +121,7 @@ def create_app():
     from routes.resultados import resultados_bp
     from routes.cancelamentos import cancelamentos_bp
     from routes.pontuacao import pontuacao_bp
+    from routes.competicao import competicao_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -126,6 +131,7 @@ def create_app():
     app.register_blueprint(resultados_bp)
     app.register_blueprint(cancelamentos_bp)
     app.register_blueprint(pontuacao_bp)
+    app.register_blueprint(competicao_bp)
 
     # Lazy DB init: ensure tables exist on first request if cold start failed
     _db_initialized = False

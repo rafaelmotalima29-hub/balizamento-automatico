@@ -57,6 +57,7 @@ class Student(db.Model):
     full_name = db.Column(db.String(150), nullable=False)
     registration = db.Column(db.String(50), nullable=False, unique=True)
     school_year = db.Column(db.String(50), nullable=False)
+    gender = db.Column(db.String(1), nullable=True)  # 'M' or 'F'
     classroom = db.Column(db.String(20), nullable=True)  # Sala (ex: 6A, 7B)
     group_id = db.Column(db.Integer, db.ForeignKey("groups.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -75,6 +76,9 @@ class Event(db.Model):
     name = db.Column(db.String(100), nullable=False, unique=True)
     num_corridas = db.Column(db.Integer, nullable=False, default=1)  # heats per student (legacy)
     competition_group = db.Column(db.String(50), nullable=True)  # ex: "6º e 7º Ano"
+    gender = db.Column(db.String(10), nullable=True)  # 'M', 'F', or 'MISTO'
+    is_relay = db.Column(db.Boolean, nullable=False, default=False)
+    relay_size = db.Column(db.Integer, nullable=True)  # e.g. 4 for 4x25m
     num_series = db.Column(db.Integer, nullable=False, default=1)   # number of heats/bateries
     athletes_per_series = db.Column(db.Integer, nullable=False, default=8)  # lanes per heat
     group_id = db.Column(db.Integer, db.ForeignKey("groups.id"), nullable=True)
@@ -85,6 +89,29 @@ class Event(db.Model):
 
     def __repr__(self):
         return f"<Event {self.name} ({self.competition_group})>"
+
+
+class EventRegistration(db.Model):
+    """
+    Inscrição de um aluno em uma prova específica.
+    Máximo de 4 provas por aluno (enforced na rota).
+    """
+    __tablename__ = "event_registrations"
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("students.id"), nullable=False)
+    event_id = db.Column(db.Integer, db.ForeignKey("events.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    student = db.relationship("Student", backref="registrations")
+    event = db.relationship("Event", backref="registrations")
+
+    __table_args__ = (
+        db.UniqueConstraint("student_id", "event_id", name="uix_student_event_reg"),
+    )
+
+    def __repr__(self):
+        return f"<EventRegistration s={self.student_id} e={self.event_id}>"
 
 
 class Result(db.Model):

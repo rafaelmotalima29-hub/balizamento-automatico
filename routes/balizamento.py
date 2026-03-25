@@ -10,7 +10,7 @@ from collections import defaultdict
 from flask import Blueprint, render_template, send_file, request
 from flask_login import login_required
 from models import Student, Event, Group
-from services.seeding import build_series, COMPETITION_GROUPS, YEAR_TO_GROUP
+from services.seeding import build_series, build_relay_series, COMPETITION_GROUPS, YEAR_TO_GROUP
 
 balizamento_bp = Blueprint("balizamento", __name__)
 
@@ -199,7 +199,12 @@ def export_xlsx():
             # ── Seeded data rows ─────────────────────────────────────
             ev_students = [s for s in group_students
                            if ev.group_id is None or s.group_id == ev.group_id]
-            all_series = build_series(ev, ev_students, event_group=group_name)
+            ev_students = _filter_by_event_gender(ev_students, ev)
+
+            if ev.is_relay:
+                all_series = build_relay_series(ev, ev_students, event_group=group_name)
+            else:
+                all_series = build_series(ev, ev_students, event_group=group_name)
 
             for series_idx, series in enumerate(all_series, start=1):
                 # ── Serie header row ─────────────────────────────────
@@ -213,28 +218,72 @@ def export_xlsx():
                 ws.row_dimensions[current_row].height = 16
                 current_row += 1
 
-                for lane_idx, student in enumerate(series, start=1):
-                    row_fill = odd_fill if (current_row % 2 == 0) else even_fill
-                    row_data = [
-                        series_idx,
-                        lane_idx,
-                        student.full_name    if student else "",
-                        student.registration if student else "",
-                        student.school_year  if student else "",
-                        student.classroom or "" if student else "",
-                        "",  # Minutos
-                        "",  # Segundos
-                        "",  # Centésimos
-                    ]
-                    use_thick = lane_idx == 1
-                    for col_idx, value in enumerate(row_data, start=1):
-                        cell = ws.cell(row=current_row, column=col_idx, value=value)
-                        cell.fill      = row_fill
-                        cell.font      = data_font
-                        cell.border    = thick_top if use_thick else thin
-                        cell.alignment = center if col_idx <= 2 else left_align
-                    ws.row_dimensions[current_row].height = 22
-                    current_row += 1
+                if ev.is_relay:
+                    # ── Relay: each lane is a team ──────────────────
+                    relay_size = ev.relay_size or 4
+                    for lane_idx, team in enumerate(series, start=1):
+                        # Team header row
+                        team_label = f"  Raia {lane_idx} — {team['year']}" if team else f"  Raia {lane_idx} — (vaga livre)"
+                        team_cell = ws.cell(row=current_row, column=1, value=team_label)
+                        team_cell.font = Font(bold=True, color=ACCENT_FG, size=10)
+                        team_cell.fill = serie_hdr_fill
+                        team_cell.alignment = left_align
+                        ws.merge_cells(start_row=current_row, start_column=1,
+                                       end_row=current_row, end_column=len(HEADER))
+                        ws.row_dimensions[current_row].height = 20
+                        current_row += 1
+
+                        # Member rows
+                        members = team["students"] if team else []
+                        for m_idx in range(relay_size):
+                            student = members[m_idx] if m_idx < len(members) else None
+                            row_fill = odd_fill if (current_row % 2 == 0) else even_fill
+                            row_data = [
+                                series_idx,
+                                lane_idx,
+                                student.full_name    if student else "",
+                                student.registration if student else "",
+                                student.school_year  if student else "",
+                                student.classroom or "" if student else "",
+                            ]
+                            # Time columns only on last member row (team time)
+                            if m_idx == relay_size - 1:
+                                row_data += ["", "", ""]  # Minutos, Segundos, Centésimos
+                            else:
+                                row_data += ["", "", ""]
+                            use_thick = m_idx == 0
+                            for col_idx, value in enumerate(row_data, start=1):
+                                cell = ws.cell(row=current_row, column=col_idx, value=value)
+                                cell.fill      = row_fill
+                                cell.font      = data_font
+                                cell.border    = thick_top if use_thick else thin
+                                cell.alignment = center if col_idx <= 2 else left_align
+                            ws.row_dimensions[current_row].height = 22
+                            current_row += 1
+                else:
+                    # ── Individual: one student per lane ─────────────
+                    for lane_idx, student in enumerate(series, start=1):
+                        row_fill = odd_fill if (current_row % 2 == 0) else even_fill
+                        row_data = [
+                            series_idx,
+                            lane_idx,
+                            student.full_name    if student else "",
+                            student.registration if student else "",
+                            student.school_year  if student else "",
+                            student.classroom or "" if student else "",
+                            "",  # Minutos
+                            "",  # Segundos
+                            "",  # Centésimos
+                        ]
+                        use_thick = lane_idx == 1
+                        for col_idx, value in enumerate(row_data, start=1):
+                            cell = ws.cell(row=current_row, column=col_idx, value=value)
+                            cell.fill      = row_fill
+                            cell.font      = data_font
+                            cell.border    = thick_top if use_thick else thin
+                            cell.alignment = center if col_idx <= 2 else left_align
+                        ws.row_dimensions[current_row].height = 22
+                        current_row += 1
 
                 # ── Spacer between series ────────────────────────────
                 if series_idx < len(all_series):
@@ -276,8 +325,15 @@ def export_xlsx():
 
 # ── Helpers ───────────────────────────────────────────────────────────
 
+def _filter_by_event_gender(students, event):
+    """Filter students by event gender (M/F/MISTO/None)."""
+    if not event.gender or event.gender == "MISTO":
+        return students
+    return [s for s in students if s.gender == event.gender]
+
+
 def _build_preview(events, students):
-    """Return {group: [(event, series_list)]} for template preview."""
+    """Return {group: [(event, series_list, is_relay)]} for template preview."""
     grouped = defaultdict(list)
     for ev in events:
         if ev.competition_group:
@@ -286,13 +342,21 @@ def _build_preview(events, students):
                 group_years    = _years_for_group(key)
                 group_students = [s for s in students if s.school_year in group_years] if group_years else students
                 ev_students    = [s for s in group_students if ev.group_id is None or s.group_id == ev.group_id]
-                series_list    = build_series(ev, ev_students, event_group=key)
-                grouped[key].append((ev, series_list))
+                ev_students    = _filter_by_event_gender(ev_students, ev)
+                if ev.is_relay:
+                    series_list = build_relay_series(ev, ev_students, event_group=key)
+                else:
+                    series_list = build_series(ev, ev_students, event_group=key)
+                grouped[key].append((ev, series_list, ev.is_relay))
         else:
             key = "Sem Grupo"
             ev_students = [s for s in students if ev.group_id is None or s.group_id == ev.group_id]
-            series_list = build_series(ev, ev_students, event_group=key)
-            grouped[key].append((ev, series_list))
+            ev_students = _filter_by_event_gender(ev_students, ev)
+            if ev.is_relay:
+                series_list = build_relay_series(ev, ev_students, event_group=key)
+            else:
+                series_list = build_series(ev, ev_students, event_group=key)
+            grouped[key].append((ev, series_list, ev.is_relay))
     return dict(grouped)
 
 

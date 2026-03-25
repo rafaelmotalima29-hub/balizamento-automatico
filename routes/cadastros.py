@@ -68,6 +68,7 @@ def add_student():
     full_name    = request.form.get("full_name", "").strip()
     registration = request.form.get("registration", "").strip()
     school_year  = request.form.get("school_year", "").strip()
+    gender       = request.form.get("gender", "").strip() or None
     classroom    = request.form.get("classroom", "").strip() or None
     group_id     = request.form.get("group_id", "").strip() or None
 
@@ -84,6 +85,7 @@ def add_student():
         full_name=full_name,
         registration=registration,
         school_year=school_year,
+        gender=gender,
         classroom=classroom,
         group_id=int(group_id) if group_id else None,
     )
@@ -102,6 +104,7 @@ def edit_student(student_id):
     full_name    = data.get("full_name", "").strip()
     registration = data.get("registration", "").strip()
     school_year  = data.get("school_year", "").strip()
+    gender       = data.get("gender", "").strip() or None
     classroom    = data.get("classroom", "").strip() or None
     group_id     = data.get("group_id", "")
     group_id     = int(group_id) if group_id else None
@@ -119,6 +122,7 @@ def edit_student(student_id):
     student.full_name    = full_name
     student.registration = registration
     student.school_year  = school_year
+    student.gender       = gender
     student.classroom    = classroom
     student.group_id     = group_id
     db.session.commit()
@@ -130,6 +134,7 @@ def edit_student(student_id):
             "full_name":    student.full_name,
             "registration": student.registration,
             "school_year":  student.school_year,
+            "gender":       student.gender or "",
             "classroom":    student.classroom or "",
             "group_id":     student.group_id,
             "group_name":   student.group.name if student.group else "",
@@ -154,7 +159,13 @@ def add_event():
     name              = request.form.get("name", "").strip()
     groups = request.form.getlist("competition_group")
     competition_group = ",".join(g.strip() for g in groups if g.strip()) or None
+    gender            = request.form.get("gender", "").strip() or None
+    is_relay          = request.form.get("is_relay") == "1"
     group_id          = request.form.get("group_id", "").strip() or None
+    try:
+        relay_size = int(request.form.get("relay_size", 4)) if is_relay else None
+    except (ValueError, TypeError):
+        relay_size = 4 if is_relay else None
     try:
         num_corridas = max(1, min(10, int(request.form.get("num_corridas", 1))))
     except (ValueError, TypeError):
@@ -181,6 +192,9 @@ def add_event():
         name=name,
         num_corridas=num_corridas,
         competition_group=competition_group,
+        gender=gender,
+        is_relay=is_relay,
+        relay_size=relay_size,
         num_series=num_series,
         athletes_per_series=athletes_per_series,
         group_id=int(group_id) if group_id else None,
@@ -199,8 +213,14 @@ def edit_event(event_id):
 
     name              = data.get("name", "").strip()
     competition_group = data.get("competition_group", "").strip() or None
+    gender            = data.get("gender", "").strip() or None
+    is_relay          = data.get("is_relay", False)
     group_id          = data.get("group_id", "")
     group_id          = int(group_id) if group_id else None
+    try:
+        relay_size = int(data.get("relay_size", 4)) if is_relay else None
+    except (ValueError, TypeError):
+        relay_size = 4 if is_relay else None
     try:
         num_series = max(1, min(50, int(data.get("num_series", 1))))
     except (ValueError, TypeError):
@@ -219,6 +239,9 @@ def edit_event(event_id):
 
     event.name              = name
     event.competition_group = competition_group
+    event.gender            = gender
+    event.is_relay          = is_relay
+    event.relay_size        = relay_size
     event.num_series        = num_series
     event.athletes_per_series = athletes_per_series
     event.group_id            = group_id
@@ -230,6 +253,9 @@ def edit_event(event_id):
             "id":                 event.id,
             "name":               event.name,
             "competition_group":  event.competition_group or "",
+            "gender":             event.gender or "",
+            "is_relay":           event.is_relay,
+            "relay_size":         event.relay_size,
             "num_series":         event.num_series,
             "athletes_per_series": event.athletes_per_series,
             "group_id":           event.group_id,

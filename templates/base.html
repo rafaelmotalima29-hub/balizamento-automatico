@@ -37,6 +37,11 @@
         <span class="nav-icon">📝</span> Cadastros
       </a>
 
+      <a href="{{ url_for('competicao.competicao') }}"
+        class="nav-link {% if request.endpoint and 'competicao' in request.endpoint %}active{% endif %}">
+        <span class="nav-icon">🏊</span> Montar Competição
+      </a>
+
       <a href="{{ url_for('balizamento.balizamento') }}"
         class="nav-link {% if request.endpoint and 'balizamento' in request.endpoint %}active{% endif %}">
         <span class="nav-icon">📤</span> Balizamento

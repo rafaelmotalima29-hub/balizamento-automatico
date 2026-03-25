@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+
+{% block title %}Montar Competição{% endblock %}
+{% block page_title %}Montar Competição{% endblock %}
+{% block page_subtitle %}Inscreva alunos nas provas (máx. {{ max_events }} provas por aluno){% endblock %}
+
+{% block content %}
+
+<!-- ══════════════════════════════════════════
+     SELEÇÃO DE PROVA
+══════════════════════════════════════════ -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header" style="margin-bottom:16px;">
+        <div class="card-title">🏁 Selecionar Prova</div>
+        {% if selected_event %}
+        <a href="{{ url_for('competicao.competicao') }}" class="btn btn-ghost btn-sm">✕ Limpar</a>
+        {% endif %}
+    </div>
+
+    <form method="GET" action="{{ url_for('competicao.competicao') }}" id="comp-filter-form">
+        <div class="form-row" style="gap:16px; align-items:flex-end;">
+            <div class="form-group" style="flex:1; margin-bottom:0;">
+                <label for="sel-event">Prova</label>
+                <select id="sel-event" name="event_id" onchange="document.getElementById('comp-filter-form').submit()">
+                    <option value="">— Selecione uma Prova —</option>
+                    {% for e in events %}
+                    <option value="{{ e.id }}" {% if selected_event_id == e.id %}selected{% endif %}>
+                        {{ e.name }}
+                        {% if e.competition_group %} · {{ e.competition_group }}{% endif %}
+                        {% if e.gender %} · {{ '♂' if e.gender == 'M' else ('♀' if e.gender == 'F' else 'Misto') }}{% endif %}
+                        {% if e.is_relay %} · Revezamento{% endif %}
+                        ({{ event_reg_counts.get(e.id, 0) }} inscrito(s))
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        {% if selected_event %}
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;">
+            <span style="display:inline-flex; align-items:center; gap:6px; background:rgba(0,201,177,.1); border:1px solid rgba(0,201,177,.3); color:var(--accent); font-size:12px; font-weight:600; padding:4px 10px; border-radius:20px;">
+                🏁 {{ selected_event.name }}
+            </span>
+            {% if selected_event.competition_group %}
+            <span style="display:inline-flex; align-items:center; gap:6px; background:rgba(99,102,241,.1); border:1px solid rgba(99,102,241,.3); color:#818cf8; font-size:12px; font-weight:600; padding:4px 10px; border-radius:20px;">
+                {{ selected_event.competition_group }}
+            </span>
+            {% endif %}
+            {% if selected_event.gender %}
+            <span style="display:inline-flex; align-items:center; gap:6px; background:rgba(255,165,0,.1); border:1px solid rgba(255,165,0,.3); color:#ffa500; font-size:12px; font-weight:600; padding:4px 10px; border-radius:20px;">
+                {{ '♂ Masculino' if selected_event.gender == 'M' else ('♀ Feminino' if selected_event.gender == 'F' else 'Misto') }}
+            </span>
+            {% endif %}
+            {% if selected_event.is_relay %}
+            <span style="display:inline-flex; align-items:center; gap:6px; background:rgba(99,102,241,.15); border:1px solid rgba(99,102,241,.3); color:#818cf8; font-size:12px; font-weight:600; padding:4px 10px; border-radius:20px;">
+                🔄 Revezamento {{ selected_event.relay_size or 4 }}x
+            </span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </form>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ESTADOS
+══════════════════════════════════════════ -->
+{% if not selected_event %}
+<div class="card" style="text-align:center; padding:56px 32px;">
+    <span style="font-size:52px; display:block; margin-bottom:16px;">🏁</span>
+    <h3 style="margin-bottom:8px;">Selecione uma prova</h3>
+    <p style="color:var(--text-muted); max-width:400px; margin:0 auto;">
+        Escolha uma prova acima para ver os alunos elegíveis e inscrever participantes.
+    </p>
+</div>
+
+<!-- Summary of all events -->
+{% if events %}
+<div class="card" style="margin-top:20px;">
+    <div class="card-title" style="margin-bottom:16px;">📋 Resumo de Inscrições</div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Prova</th>
+                    <th>Grupo</th>
+                    <th>Sexo</th>
+                    <th>Tipo</th>
+                    <th style="text-align:center;">Inscritos</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in events %}
+                <tr style="cursor:pointer;" onclick="window.location='{{ url_for('competicao.competicao', event_id=e.id) }}'">
+                    <td><strong>{{ e.name }}</strong></td>
+                    <td style="color:var(--text-muted);">{{ e.competition_group or '—' }}</td>
+                    <td>
+                        {% if e.gender == 'M' %}
+                        <span style="color:#5b9bd5;">♂</span>
+                        {% elif e.gender == 'F' %}
+                        <span style="color:#e87da0;">♀</span>
+                        {% elif e.gender == 'MISTO' %}
+                        <span style="color:#ffa500;">Misto</span>
+                        {% else %}
+                        <span style="color:var(--text-muted);">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if e.is_relay %}
+                        <span class="badge" style="font-size:10px; background:rgba(99,102,241,.15); color:#818cf8;">Revezamento</span>
+                        {% else %}
+                        Individual
+                        {% endif %}
+                    </td>
+                    <td style="text-align:center;">
+                        <span class="badge badge-accent" style="font-size:12px;">{{ event_reg_counts.get(e.id, 0) }}</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% elif eligible_students | length == 0 %}
+<div class="empty-state" style="margin-top:16px;">
+    <span class="empty-state-icon">📭</span>
+    <h3>Nenhum aluno elegível</h3>
+    <p>Não há alunos cadastrados que se encaixem nos filtros dessa prova (grupo de competição, sexo).</p>
+    <br />
+    <a href="{{ url_for('cadastros.cadastros') }}" class="btn btn-primary">Ir para Cadastros</a>
+</div>
+
+{% else %}
+
+<!-- ══════════════════════════════════════════
+     METRICS
+══════════════════════════════════════════ -->
+<div class="metrics-bar" style="margin-bottom:20px;">
+    <div class="metric-chip">
+        <span class="metric-icon">🤽</span>
+        <span class="metric-value" id="metric-eligible">{{ eligible_students | length }}</span>
+        <span class="metric-label">Elegíveis</span>
+    </div>
+    <div class="metric-sep"></div>
+    <div class="metric-chip">
+        <span class="metric-icon">✅</span>
+        <span class="metric-value" id="metric-assigned">{{ assigned_ids | length }}</span>
+        <span class="metric-label">Inscritos</span>
+    </div>
+    <div class="metric-sep"></div>
+    <div class="metric-chip">
+        <span class="metric-icon">📊</span>
+        <span class="metric-value" id="metric-available">{{ eligible_students | length - assigned_ids | length }}</span>
+        <span class="metric-label">Disponíveis</span>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SEARCH & ACTIONS
+══════════════════════════════════════════ -->
+<div class="card" style="margin-bottom:20px;">
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <div class="form-group" style="flex:1; min-width:200px; margin-bottom:0;">
+            <input type="text" id="search-students" placeholder="Buscar aluno por nome ou matrícula..."
+                   oninput="filterCompStudents()" style="margin-bottom:0;" />
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="selectAll()" title="Inscrever todos elegíveis">
+                ✅ Inscrever Todos
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="deselectAll()" title="Remover todas inscrições">
+                ✕ Remover Todos
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     STUDENT LIST
+══════════════════════════════════════════ -->
+<div class="card">
+    <div class="table-wrapper">
+        <table id="students-table">
+            <thead>
+                <tr>
+                    <th style="width:50px; text-align:center;">
+                        <span title="Inscrito">✅</span>
+                    </th>
+                    <th>Aluno</th>
+                    <th>Matrícula</th>
+                    <th>Ano</th>
+                    <th>Sexo</th>
+                    <th>Sala</th>
+                    <th style="text-align:center;" title="Provas inscritas">Provas</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in eligible_students %}
+                {% set is_assigned = s.id in assigned_ids %}
+                {% set evt_count = student_event_counts.get(s.id, 0) %}
+                {% set at_max = evt_count >= max_events and not is_assigned %}
+                <tr id="row-{{ s.id }}"
+                    data-name="{{ s.full_name | lower }}"
+                    data-reg="{{ s.registration | lower }}"
+                    data-assigned="{{ '1' if is_assigned else '0' }}"
+                    style="{% if at_max %}opacity:0.5;{% endif %}">
+                    <td style="text-align:center;">
+                        <label class="toggle-check" style="cursor:pointer;">
+                            <input type="checkbox"
+                                   id="cb-{{ s.id }}"
+                                   {% if is_assigned %}checked{% endif %}
+                                   {% if at_max %}disabled title="Máximo de {{ max_events }} provas atingido"{% endif %}
+                                   onchange="toggleStudent({{ s.id }}, {{ selected_event_id }})"
+                                   style="width:18px; height:18px; accent-color:var(--accent); cursor:pointer;" />
+                        </label>
+                    </td>
+                    <td><strong>{{ s.full_name }}</strong></td>
+                    <td style="color:var(--text-muted);">{{ s.registration }}</td>
+                    <td><span class="badge badge-accent" style="font-size:11px;">{{ s.school_year }}</span></td>
+                    <td>
+                        {% if s.gender == 'M' %}
+                        <span style="color:#5b9bd5;">♂</span>
+                        {% elif s.gender == 'F' %}
+                        <span style="color:#e87da0;">♀</span>
+                        {% else %}
+                        <span style="color:var(--text-muted);">—</span>
+                        {% endif %}
+                    </td>
+                    <td style="color:var(--text-muted);">{{ s.classroom or '—' }}</td>
+                    <td style="text-align:center;">
+                        <span id="count-{{ s.id }}"
+                              class="badge {% if evt_count >= max_events %}badge-warning{% else %}badge-accent{% endif %}"
+                              style="font-size:11px; {% if evt_count >= max_events %}background:rgba(239,68,68,.15); color:#ef4444;{% endif %}">
+                            {{ evt_count }}/{{ max_events }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const MAX_EVENTS = {{ max_events }};
+const EVENT_ID = {{ selected_event_id or 'null' }};
+
+async function toggleStudent(studentId, eventId) {
+    const cb = document.getElementById(`cb-${studentId}`);
+    const row = document.getElementById(`row-${studentId}`);
+
+    try {
+        const resp = await fetch('{{ url_for("competicao.toggle_registration") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ student_id: studentId, event_id: eventId })
+        });
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            cb.checked = !cb.checked;  // revert
+            showToast(data.error || 'Erro ao atualizar inscrição.', 'error');
+            return;
+        }
+
+        // Update count badge
+        const countEl = document.getElementById(`count-${studentId}`);
+        if (countEl) {
+            countEl.textContent = `${data.event_count}/${MAX_EVENTS}`;
+            if (data.event_count >= MAX_EVENTS) {
+                countEl.style.background = 'rgba(239,68,68,.15)';
+                countEl.style.color = '#ef4444';
+            } else {
+                countEl.style.background = '';
+                countEl.style.color = '';
+            }
+        }
+
+        // Update row state
+        row.dataset.assigned = data.action === 'added' ? '1' : '0';
+
+        // If at max and not assigned, disable checkbox
+        if (data.event_count >= MAX_EVENTS && data.action !== 'added') {
+            // shouldn't happen — just removed, so count < max
+        }
+
+        // Update metrics
+        updateMetrics();
+
+        const action = data.action === 'added' ? 'inscrito' : 'removido';
+        showToast(`Aluno ${action} com sucesso!`, 'success');
+
+    } catch (err) {
+        cb.checked = !cb.checked;
+        showToast('Erro de conexão.', 'error');
+    }
+}
+
+function updateMetrics() {
+    const rows = document.querySelectorAll('#students-table tbody tr');
+    let assigned = 0;
+    rows.forEach(r => {
+        if (r.dataset.assigned === '1') assigned++;
+    });
+    const el = (id) => document.getElementById(id);
+    if (el('metric-assigned')) el('metric-assigned').textContent = assigned;
+    if (el('metric-available')) el('metric-available').textContent = rows.length - assigned;
+}
+
+function filterCompStudents() {
+    const q = document.getElementById('search-students').value.toLowerCase().trim();
+    document.querySelectorAll('#students-table tbody tr').forEach(row => {
+        const match = !q || row.dataset.name.includes(q) || row.dataset.reg.includes(q);
+        row.style.display = match ? '' : 'none';
+    });
+}
+
+async function selectAll() {
+    const rows = document.querySelectorAll('#students-table tbody tr');
+    for (const row of rows) {
+        if (row.style.display === 'none') continue;
+        const cb = row.querySelector('input[type="checkbox"]');
+        if (cb && !cb.checked && !cb.disabled) {
+            cb.checked = true;
+            const studentId = parseInt(row.id.replace('row-', ''));
+            await toggleStudent(studentId, EVENT_ID);
+        }
+    }
+}
+
+async function deselectAll() {
+    const rows = document.querySelectorAll('#students-table tbody tr');
+    for (const row of rows) {
+        if (row.style.display === 'none') continue;
+        const cb = row.querySelector('input[type="checkbox"]');
+        if (cb && cb.checked) {
+            cb.checked = false;
+            const studentId = parseInt(row.id.replace('row-', ''));
+            await toggleStudent(studentId, EVENT_ID);
+        }
+    }
+}
+
+function showToast(msg, type) {
+    const existing = document.querySelector('.toast-notification');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    const bg = type === 'error' ? '#ef4444' : '#00c9b1';
+    toast.style.cssText = `
+        position:fixed; bottom:24px; right:24px; z-index:9999;
+        background:${bg}; color:#fff; padding:12px 20px;
+        border-radius:8px; font-size:14px; font-weight:600;
+        box-shadow:0 4px 12px rgba(0,0,0,.3);
+        animation: fadeIn 0.3s ease;
+    `;
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+</script>
+{% endblock %}

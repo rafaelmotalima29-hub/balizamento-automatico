@@ -132,13 +132,17 @@
         <span class="badge badge-accent" style="font-size:12px;">{{ group_name }}</span>
     </div>
 
-    {% for event, series_list in event_series_list %}
+    {% for event, series_list, is_relay in event_series_list %}
     <div class="bal-event-block">
         <div class="bal-event-title">
             🏁 {{ event.name }}
+            {% if is_relay %}
+            <span style="background:rgba(99,102,241,.15); color:#818cf8; font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px; margin-left:6px;">
+                REVEZAMENTO {{ event.relay_size or 4 }}x
+            </span>
+            {% endif %}
             <span style="font-weight:400; color:var(--text-muted); font-size:12px; margin-left:8px;">
                 {{ event.num_series }} série(s) × {{ event.athletes_per_series }} raias
-                · {{ series_list | map('length') | sum }} vagas
             </span>
         </div>
 
@@ -147,6 +151,49 @@
         <div class="bal-serie-block">
             <div class="bal-serie-label">Série {{ serie_num }} de {{ series_list | length }}</div>
             <div class="table-wrapper" style="border:none; border-radius:0;">
+                {% if is_relay %}
+                <!-- ── Relay layout: teams per lane ── -->
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:50px;">Raia</th>
+                            <th>Equipe</th>
+                            <th>Atletas</th>
+                            <th>Qtd</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for team in serie %}
+                        <tr>
+                            <td style="text-align:center; color:var(--text-muted);">{{ loop.index }}</td>
+                            {% if team %}
+                            <td>
+                                <strong>{{ team.year }}</strong>
+                            </td>
+                            <td>
+                                {% for s in team.students %}
+                                <span style="display:inline-block; background:var(--bg-input); padding:2px 8px; border-radius:12px; font-size:11px; margin:2px 2px;">
+                                    {{ s.full_name }}
+                                </span>
+                                {% endfor %}
+                                {% if team.all_students | length > team.students | length %}
+                                <span style="color:var(--text-muted); font-size:11px; margin-left:4px;">
+                                    +{{ team.all_students | length - team.students | length }} disponível(eis)
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align:center;">
+                                <span class="badge badge-accent" style="font-size:11px;">{{ team.students | length }}/{{ event.relay_size or 4 }}</span>
+                            </td>
+                            {% else %}
+                            <td style="color:var(--text-muted); font-style:italic;" colspan="3">— vaga livre —</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <!-- ── Individual layout ── -->
                 <table>
                     <thead>
                         <tr>
@@ -173,6 +220,7 @@
                         {% endfor %}
                     </tbody>
                 </table>
+                {% endif %}
             </div>
         </div>
         {% endfor %}

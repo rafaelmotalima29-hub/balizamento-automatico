@@ -60,6 +60,20 @@
                     <input type="text" id="full_name" name="full_name"
                            placeholder="ex: João Silva" required autocomplete="off" />
                 </div>
+                <div class="form-group">
+                    <label>Sexo</label>
+                    <input type="hidden" id="gender" name="gender" value="" />
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" class="btn gender-toggle-btn" data-value="M" onclick="selectGender('M', 'gender', this)"
+                                style="flex:1; border:2px solid var(--border); background:var(--bg-input); color:var(--text-secondary); font-weight:600;">
+                            ♂ Masculino
+                        </button>
+                        <button type="button" class="btn gender-toggle-btn" data-value="F" onclick="selectGender('F', 'gender', this)"
+                                style="flex:1; border:2px solid var(--border); background:var(--bg-input); color:var(--text-secondary); font-weight:600;">
+                            ♀ Feminino
+                        </button>
+                    </div>
+                </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="registration">Matrícula</label>
@@ -149,6 +163,11 @@
                     <button class="filter-pill" onclick="setStudentYear('{{ y }}', this)">{{ y }}</button>
                     {% endfor %}
                 </div>
+                <div class="filter-pills" id="gender-filter-pills" style="margin-top:6px;">
+                    <button class="filter-pill active" onclick="setStudentGender('all', this)">Todos</button>
+                    <button class="filter-pill" onclick="setStudentGender('M', this)">♂ Masculino</button>
+                    <button class="filter-pill" onclick="setStudentGender('F', this)">♀ Feminino</button>
+                </div>
             </div>
 
             <div class="table-wrapper student-table-wrap" style="border:none; border-radius:0;">
@@ -168,8 +187,9 @@
                         <tr id="student-row-{{ s.id }}"
                             data-name="{{ s.full_name | lower }}"
                             data-registration="{{ s.registration | lower }}"
-                            data-year="{{ s.school_year }}">
-                            <td id="s-name-{{ s.id }}"><strong>{{ s.full_name }}</strong></td>
+                            data-year="{{ s.school_year }}"
+                            data-gender="{{ s.gender or '' }}">
+                            <td id="s-name-{{ s.id }}"><strong>{% if s.gender == 'M' %}<span style="color:#5b9bd5;" title="Masculino">♂</span>{% elif s.gender == 'F' %}<span style="color:#e57fb3;" title="Feminino">♀</span>{% endif %} {{ s.full_name }}</strong></td>
                             <td id="s-reg-{{ s.id }}" style="color:var(--text-muted);">{{ s.registration }}</td>
                             <td id="s-class-{{ s.id }}" style="color:var(--text-muted);">{{ s.classroom or '—' }}</td>
                             <td id="s-group-{{ s.id }}" style="color:var(--text-muted);">{{ s.group.name if s.group else '—' }}</td>
@@ -177,7 +197,7 @@
                             <td style="text-align:right;">
                                 <div style="display:inline-flex; gap:4px;">
                                     <button class="btn btn-ghost btn-sm btn-icon" title="Editar aluno"
-                                        onclick="openEditStudent({{ s.id }}, '{{ s.full_name | replace("'", "\\'") }}', '{{ s.registration }}', '{{ s.school_year }}', '{{ s.classroom or '' }}', '{{ s.group_id or '' }}')">
+                                        onclick="openEditStudent({{ s.id }}, '{{ s.full_name | replace("'", "\\'") }}', '{{ s.registration }}', '{{ s.school_year }}', '{{ s.gender or '' }}', '{{ s.classroom or '' }}', '{{ s.group_id or '' }}')">
                                         ✏️
                                     </button>
                                     <button class="btn btn-danger btn-sm btn-icon" title="Remover aluno"
@@ -224,7 +244,53 @@
                 <div class="form-group">
                     <label for="event_name">Nome da Prova</label>
                     <input type="text" id="event_name" name="name"
-                           placeholder="ex: 50m Livre, 4x25m Misto" required />
+                           placeholder="ex: 50m Livre, 4x25m Revezamento" required />
+                </div>
+
+                <div class="form-group">
+                    <label>Tipo de Prova</label>
+                    <input type="hidden" id="event_is_relay" name="is_relay" value="0" />
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" class="btn relay-toggle-btn active-toggle" data-value="0"
+                                onclick="selectRelay('0', this)"
+                                style="flex:1; border:2px solid var(--accent); background:rgba(0,201,177,.12); color:var(--accent); font-weight:600;">
+                            🏊 Individual
+                        </button>
+                        <button type="button" class="btn relay-toggle-btn" data-value="1"
+                                onclick="selectRelay('1', this)"
+                                style="flex:1; border:2px solid var(--border); background:var(--bg-input); color:var(--text-secondary); font-weight:600;">
+                            🔄 Revezamento
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group" id="relay-size-group" style="display:none;">
+                    <label for="relay_size">Nadadores por Equipe</label>
+                    <input type="number" id="relay_size" name="relay_size" min="2" max="8" value="4" />
+                    <p style="font-size:11px; color:var(--text-muted); margin-top:4px;">
+                        💡 Cada raia receberá uma equipe com esse número de nadadores do mesmo ano.
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    <label>Sexo da Prova</label>
+                    <input type="hidden" id="event_gender" name="gender" value="" />
+                    <div style="display:flex; gap:6px;">
+                        <button type="button" class="btn event-gender-btn" data-value="M"
+                                onclick="selectEventGender('M', this)"
+                                style="flex:1; border:2px solid var(--border); background:var(--bg-input); color:var(--text-secondary); font-weight:600; font-size:13px;">
+                            ♂ Masc
+                        </button>
+                        <button type="button" class="btn event-gender-btn" data-value="F"
+                                onclick="selectEventGender('F', this)"
+                                style="flex:1; border:2px solid var(--border); background:var(--bg-input); color:var(--text-secondary); font-weight:600; font-size:13px;">
+                            ♀ Fem
+                        </button>
+                        <button type="button" class="btn event-gender-btn" data-value="MISTO"
+                                onclick="selectEventGender('MISTO', this)"
+                                style="flex:1; border:2px solid var(--border); background:var(--bg-input); color:var(--text-secondary); font-weight:600; font-size:13px;">
+                            🔀 Misto
+                        </button>
+                    </div>
                 </div>
 
                 <!-- BASE / TURMA — in destaque, como seleção de lista no e-mail marketing -->
@@ -342,6 +408,7 @@
                     <thead>
                         <tr>
                             <th>Nome da Prova</th>
+                            <th>Sexo</th>
                             <th>Grupos Idade</th>
                             <th>Turma Restrita</th>
                             <th>Séries</th>
@@ -352,7 +419,16 @@
                     <tbody id="events-tbody">
                         {% for e in events %}
                         <tr id="event-row-{{ e.id }}" data-group="{{ e.competition_group or '' }}">
-                            <td id="e-name-{{ e.id }}"><strong>{{ e.name }}</strong></td>
+                            <td id="e-name-{{ e.id }}">
+                                <strong>{{ e.name }}</strong>
+                                {% if e.is_relay %}<span class="badge" style="font-size:10px; background:rgba(255,165,0,.15); color:#ffa500; margin-left:4px;">🔄 Revez.</span>{% endif %}
+                            </td>
+                            <td id="e-gender-{{ e.id }}">
+                                {% if e.gender == 'M' %}<span style="color:#5b9bd5; font-weight:600;">♂ Masc</span>
+                                {% elif e.gender == 'F' %}<span style="color:#e57fb3; font-weight:600;">♀ Fem</span>
+                                {% elif e.gender == 'MISTO' %}<span style="color:var(--accent); font-weight:600;">🔀 Misto</span>
+                                {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+                            </td>
                             <td id="e-group-{{ e.id }}">
                                 {% if e.competition_group %}
                                     {% for g in e.competition_group.split(',') %}
@@ -368,7 +444,7 @@
                             <td style="text-align:right;">
                                 <div style="display:inline-flex; gap:4px;">
                                     <button class="btn btn-ghost btn-sm btn-icon" title="Editar prova"
-                                        onclick="openEditEvent({{ e.id }}, '{{ e.name | replace("'", "\\'") }}', '{{ e.competition_group or '' }}', {{ e.num_series }}, {{ e.athletes_per_series }}, '{{ e.group_id or '' }}')">
+                                        onclick="openEditEvent({{ e.id }}, '{{ e.name | replace("'", "\\'") }}', '{{ e.competition_group or '' }}', {{ e.num_series }}, {{ e.athletes_per_series }}, '{{ e.group_id or '' }}', '{{ e.gender or '' }}', {{ 'true' if e.is_relay else 'false' }}, {{ e.relay_size or 4 }})">
                                         ✏️
                                     </button>
                                     <button class="btn btn-danger btn-sm btn-icon" title="Remover prova"
@@ -585,6 +661,22 @@
             <label for="edit-student-name">Nome Completo</label>
             <input type="text" id="edit-student-name" placeholder="Nome completo" autocomplete="off" />
         </div>
+        <div class="form-group">
+            <label>Sexo</label>
+            <input type="hidden" id="edit-student-gender" value="" />
+            <div style="display:flex; gap:8px;">
+                <button type="button" class="btn edit-gender-toggle-btn" data-value="M"
+                        onclick="selectGender('M', 'edit-student-gender', this)"
+                        style="flex:1; border:2px solid var(--border); background:var(--bg-input); color:var(--text-secondary); font-weight:600;">
+                    ♂ Masculino
+                </button>
+                <button type="button" class="btn edit-gender-toggle-btn" data-value="F"
+                        onclick="selectGender('F', 'edit-student-gender', this)"
+                        style="flex:1; border:2px solid var(--border); background:var(--bg-input); color:var(--text-secondary); font-weight:600;">
+                    ♀ Feminino
+                </button>
+            </div>
+        </div>
         <div class="form-row">
             <div class="form-group">
                 <label for="edit-student-reg">Matrícula</label>
@@ -643,6 +735,47 @@
         <div class="form-group">
             <label for="edit-event-name">Nome da Prova</label>
             <input type="text" id="edit-event-name" placeholder="ex: 50m Livre" autocomplete="off" />
+        </div>
+        <div class="form-group">
+            <label>Tipo de Prova</label>
+            <input type="hidden" id="edit-event-is-relay" value="0" />
+            <div style="display:flex; gap:8px;">
+                <button type="button" class="btn edit-relay-toggle-btn active-toggle" data-value="0"
+                        onclick="selectEditRelay('0', this)"
+                        style="flex:1; border:2px solid var(--accent); background:rgba(0,201,177,.12); color:var(--accent); font-weight:600;">
+                    🏊 Individual
+                </button>
+                <button type="button" class="btn edit-relay-toggle-btn" data-value="1"
+                        onclick="selectEditRelay('1', this)"
+                        style="flex:1; border:2px solid var(--border); background:var(--bg-input); color:var(--text-secondary); font-weight:600;">
+                    🔄 Revezamento
+                </button>
+            </div>
+        </div>
+        <div class="form-group" id="edit-relay-size-group" style="display:none;">
+            <label for="edit-relay-size">Nadadores por Equipe</label>
+            <input type="number" id="edit-relay-size" min="2" max="8" value="4" />
+        </div>
+        <div class="form-group">
+            <label>Sexo da Prova</label>
+            <input type="hidden" id="edit-event-gender" value="" />
+            <div style="display:flex; gap:6px;">
+                <button type="button" class="btn edit-event-gender-btn" data-value="M"
+                        onclick="selectEditEventGender('M', this)"
+                        style="flex:1; border:2px solid var(--border); background:var(--bg-input); color:var(--text-secondary); font-weight:600; font-size:13px;">
+                    ♂ Masc
+                </button>
+                <button type="button" class="btn edit-event-gender-btn" data-value="F"
+                        onclick="selectEditEventGender('F', this)"
+                        style="flex:1; border:2px solid var(--border); background:var(--bg-input); color:var(--text-secondary); font-weight:600; font-size:13px;">
+                    ♀ Fem
+                </button>
+                <button type="button" class="btn edit-event-gender-btn" data-value="MISTO"
+                        onclick="selectEditEventGender('MISTO', this)"
+                        style="flex:1; border:2px solid var(--border); background:var(--bg-input); color:var(--text-secondary); font-weight:600; font-size:13px;">
+                    🔀 Misto
+                </button>
+            </div>
         </div>
         <div class="form-group">
             <label for="edit-event-group">
@@ -706,9 +839,99 @@
 // ── Student data for auto-calculation ────────────────────────────────
 const STUDENTS_DATA = [
     {% for s in students %}
-    { year: {{ s.school_year | tojson }}, group_id: {{ s.group_id if s.group_id else 'null' }} }{% if not loop.last %},{% endif %}
+    { year: {{ s.school_year | tojson }}, group_id: {{ s.group_id if s.group_id else 'null' }}, gender: {{ (s.gender or '') | tojson }} }{% if not loop.last %},{% endif %}
     {% endfor %}
 ];
+
+// ── Gender toggle (student form) ────────────────────────────────────
+function selectGender(value, inputId, btn) {
+    document.getElementById(inputId).value = value;
+    const parent = btn.parentElement;
+    parent.querySelectorAll('.btn').forEach(b => {
+        b.style.border = '2px solid var(--border)';
+        b.style.background = 'var(--bg-input)';
+        b.style.color = 'var(--text-secondary)';
+    });
+    if (value === 'M') {
+        btn.style.border = '2px solid #5b9bd5';
+        btn.style.background = 'rgba(91,155,213,.12)';
+        btn.style.color = '#5b9bd5';
+    } else {
+        btn.style.border = '2px solid #e57fb3';
+        btn.style.background = 'rgba(229,127,179,.12)';
+        btn.style.color = '#e57fb3';
+    }
+}
+
+// ── Event gender toggle ─────────────────────────────────────────────
+function selectEventGender(value, btn) {
+    document.getElementById('event_gender').value = value;
+    btn.parentElement.querySelectorAll('.btn').forEach(b => {
+        b.style.border = '2px solid var(--border)';
+        b.style.background = 'var(--bg-input)';
+        b.style.color = 'var(--text-secondary)';
+    });
+    btn.style.border = '2px solid var(--accent)';
+    btn.style.background = 'rgba(0,201,177,.12)';
+    btn.style.color = 'var(--accent)';
+    autoCalcNewEvent();
+}
+
+function selectEditEventGender(value, btn) {
+    document.getElementById('edit-event-gender').value = value;
+    btn.parentElement.querySelectorAll('.btn').forEach(b => {
+        b.style.border = '2px solid var(--border)';
+        b.style.background = 'var(--bg-input)';
+        b.style.color = 'var(--text-secondary)';
+    });
+    btn.style.border = '2px solid var(--accent)';
+    btn.style.background = 'rgba(0,201,177,.12)';
+    btn.style.color = 'var(--accent)';
+    autoCalcEditEvent();
+}
+
+// ── Relay toggle ────────────────────────────────────────────────────
+function selectRelay(value, btn) {
+    document.getElementById('event_is_relay').value = value;
+    document.querySelectorAll('.relay-toggle-btn').forEach(b => {
+        b.style.border = '2px solid var(--border)';
+        b.style.background = 'var(--bg-input)';
+        b.style.color = 'var(--text-secondary)';
+        b.classList.remove('active-toggle');
+    });
+    btn.style.border = '2px solid var(--accent)';
+    btn.style.background = 'rgba(0,201,177,.12)';
+    btn.style.color = 'var(--accent)';
+    btn.classList.add('active-toggle');
+    document.getElementById('relay-size-group').style.display = value === '1' ? 'block' : 'none';
+    autoCalcNewEvent();
+}
+
+function selectEditRelay(value, btn) {
+    document.getElementById('edit-event-is-relay').value = value;
+    document.querySelectorAll('.edit-relay-toggle-btn').forEach(b => {
+        b.style.border = '2px solid var(--border)';
+        b.style.background = 'var(--bg-input)';
+        b.style.color = 'var(--text-secondary)';
+        b.classList.remove('active-toggle');
+    });
+    btn.style.border = '2px solid var(--accent)';
+    btn.style.background = 'rgba(0,201,177,.12)';
+    btn.style.color = 'var(--accent)';
+    btn.classList.add('active-toggle');
+    document.getElementById('edit-relay-size-group').style.display = value === '1' ? 'block' : 'none';
+    autoCalcEditEvent();
+}
+
+// ── Gender filter for students ──────────────────────────────────────
+let activeStudentGender = 'all';
+
+function setStudentGender(gender, btn) {
+    activeStudentGender = gender;
+    document.querySelectorAll('#gender-filter-pills .filter-pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    filterStudents();
+}
 
 const COMP_GROUP_YEARS = {
     "6º e 7º Ano":  ["6º Ano", "7º Ano"],
@@ -716,18 +939,33 @@ const COMP_GROUP_YEARS = {
     "Ensino Médio": ["1º Ano Médio", "2º Ano Médio", "3º Ano Médio"]
 };
 
-function countEligibleStudents(selectedCompGroups, groupId) {
+function countEligibleStudents(selectedCompGroups, groupId, eventGender) {
     const eligibleYears = selectedCompGroups.flatMap(g => COMP_GROUP_YEARS[g] || []);
     return STUDENTS_DATA.filter(s => {
-        const matchTurma = !groupId || String(s.group_id) === String(groupId);
-        const matchYear  = eligibleYears.length === 0 || eligibleYears.includes(s.year);
-        return matchTurma && matchYear;
+        const matchTurma  = !groupId || String(s.group_id) === String(groupId);
+        const matchYear   = eligibleYears.length === 0 || eligibleYears.includes(s.year);
+        const matchGender = !eventGender || eventGender === 'MISTO' || s.gender === eventGender;
+        return matchTurma && matchYear && matchGender;
     }).length;
+}
+
+function countEligibleTeams(selectedCompGroups, groupId, eventGender) {
+    const eligibleYears = selectedCompGroups.flatMap(g => COMP_GROUP_YEARS[g] || []);
+    const yearsWithStudents = new Set();
+    STUDENTS_DATA.forEach(s => {
+        const matchTurma  = !groupId || String(s.group_id) === String(groupId);
+        const matchYear   = eligibleYears.length === 0 || eligibleYears.includes(s.year);
+        const matchGender = !eventGender || eventGender === 'MISTO' || s.gender === eventGender;
+        if (matchTurma && matchYear && matchGender) yearsWithStudents.add(s.year);
+    });
+    return yearsWithStudents.size;
 }
 
 function autoCalcNewEvent() {
     const selectedGroups = Array.from(document.querySelectorAll('.new-event-group-cb:checked')).map(el => el.value);
     const groupId  = document.getElementById('event_group_id')?.value || '';
+    const eventGender = document.getElementById('event_gender')?.value || '';
+    const isRelay  = document.getElementById('event_is_relay')?.value === '1';
     const lanes    = parseInt(document.getElementById('athletes_per_series')?.value) || 8;
     const seriesEl = document.getElementById('num_series');
     const hintEl   = document.getElementById('new-series-hint');
@@ -739,19 +977,33 @@ function autoCalcNewEvent() {
         return;
     }
 
-    const count  = countEligibleStudents(selectedGroups, groupId);
-    const series = count > 0 ? Math.max(1, Math.ceil(count / lanes)) : 1;
-    if (seriesEl) seriesEl.value = series;
-    if (badgeEl) badgeEl.style.display = '';
-    if (hintEl) {
-        const turmaLabel = groupId ? '' : ' (todas as bases)';
-        hintEl.innerHTML = `✅ <strong>${count} alunos elegíveis${turmaLabel}</strong> → <strong>${series} série(s)</strong> × ${lanes} raias`;
+    if (isRelay) {
+        const teams  = countEligibleTeams(selectedGroups, groupId, eventGender);
+        const series = teams > 0 ? Math.max(1, Math.ceil(teams / lanes)) : 1;
+        if (seriesEl) seriesEl.value = series;
+        if (badgeEl) badgeEl.style.display = '';
+        if (hintEl) {
+            const genderLabel = eventGender === 'M' ? ' ♂' : eventGender === 'F' ? ' ♀' : '';
+            hintEl.innerHTML = `✅ <strong>${teams} equipe(s)${genderLabel}</strong> → <strong>${series} série(s)</strong> × ${lanes} raias`;
+        }
+    } else {
+        const count  = countEligibleStudents(selectedGroups, groupId, eventGender);
+        const series = count > 0 ? Math.max(1, Math.ceil(count / lanes)) : 1;
+        if (seriesEl) seriesEl.value = series;
+        if (badgeEl) badgeEl.style.display = '';
+        if (hintEl) {
+            const turmaLabel = groupId ? '' : ' (todas as bases)';
+            const genderLabel = eventGender === 'M' ? ' ♂' : eventGender === 'F' ? ' ♀' : '';
+            hintEl.innerHTML = `✅ <strong>${count} alunos elegíveis${genderLabel}${turmaLabel}</strong> → <strong>${series} série(s)</strong> × ${lanes} raias`;
+        }
     }
 }
 
 function autoCalcEditEvent() {
     const selectedGroups = Array.from(document.querySelectorAll('.edit-group-cb:checked')).map(el => el.value);
     const groupId  = document.getElementById('edit-event-group')?.value || '';
+    const eventGender = document.getElementById('edit-event-gender')?.value || '';
+    const isRelay  = document.getElementById('edit-event-is-relay')?.value === '1';
     const lanes    = parseInt(document.getElementById('edit-event-lanes')?.value) || 8;
     const seriesEl = document.getElementById('edit-event-series');
     const hintEl   = document.getElementById('edit-series-hint');
@@ -763,13 +1015,25 @@ function autoCalcEditEvent() {
         return;
     }
 
-    const count  = countEligibleStudents(selectedGroups, groupId);
-    const series = count > 0 ? Math.max(1, Math.ceil(count / lanes)) : (parseInt(seriesEl?.value) || 1);
-    if (seriesEl) seriesEl.value = series;
-    if (badgeEl) badgeEl.style.display = '';
-    if (hintEl) {
-        const turmaLabel = groupId ? '' : ' (todas as bases)';
-        hintEl.innerHTML = `✅ <strong>${count} alunos elegíveis${turmaLabel}</strong> → <strong>${series} série(s)</strong> × ${lanes} raias`;
+    if (isRelay) {
+        const teams  = countEligibleTeams(selectedGroups, groupId, eventGender);
+        const series = teams > 0 ? Math.max(1, Math.ceil(teams / lanes)) : (parseInt(seriesEl?.value) || 1);
+        if (seriesEl) seriesEl.value = series;
+        if (badgeEl) badgeEl.style.display = '';
+        if (hintEl) {
+            const genderLabel = eventGender === 'M' ? ' ♂' : eventGender === 'F' ? ' ♀' : '';
+            hintEl.innerHTML = `✅ <strong>${teams} equipe(s)${genderLabel}</strong> → <strong>${series} série(s)</strong> × ${lanes} raias`;
+        }
+    } else {
+        const count  = countEligibleStudents(selectedGroups, groupId, eventGender);
+        const series = count > 0 ? Math.max(1, Math.ceil(count / lanes)) : (parseInt(seriesEl?.value) || 1);
+        if (seriesEl) seriesEl.value = series;
+        if (badgeEl) badgeEl.style.display = '';
+        if (hintEl) {
+            const turmaLabel = groupId ? '' : ' (todas as bases)';
+            const genderLabel = eventGender === 'M' ? ' ♂' : eventGender === 'F' ? ' ♀' : '';
+            hintEl.innerHTML = `✅ <strong>${count} alunos elegíveis${genderLabel}${turmaLabel}</strong> → <strong>${series} série(s)</strong> × ${lanes} raias`;
+        }
     }
 }
 
@@ -850,9 +1114,10 @@ function filterStudents() {
 
     rows.forEach(row => {
         const matchYear   = activeStudentYear === 'all' || row.dataset.year === activeStudentYear;
+        const matchGender = activeStudentGender === 'all' || row.dataset.gender === activeStudentGender;
         const matchSearch = !search || row.dataset.name.includes(search) || row.dataset.registration.includes(search);
-        row.style.display = (matchYear && matchSearch) ? '' : 'none';
-        if (matchYear && matchSearch) visible++;
+        row.style.display = (matchYear && matchGender && matchSearch) ? '' : 'none';
+        if (matchYear && matchGender && matchSearch) visible++;
     });
 
     document.getElementById('students-visible-count').textContent = visible;
@@ -889,15 +1154,26 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Edit Student ─────────────────────────────────────────────────────
-function openEditStudent(id, name, registration, year, classroom, groupId) {
+function openEditStudent(id, name, registration, year, gender, classroom, groupId) {
     document.getElementById('edit-student-id').value       = id;
     document.getElementById('edit-student-name').value     = name;
     document.getElementById('edit-student-reg').value      = registration;
     document.getElementById('edit-student-year').value     = year;
     document.getElementById('edit-student-class').value    = classroom;
     document.getElementById('edit-student-group').value    = groupId || '';
+    document.getElementById('edit-student-gender').value   = gender || '';
     document.getElementById('edit-student-subtitle').textContent = `Matrícula: ${registration}`;
     document.getElementById('edit-student-error').style.display = 'none';
+    // Reset gender toggle buttons
+    document.querySelectorAll('.edit-gender-toggle-btn').forEach(b => {
+        b.style.border = '2px solid var(--border)';
+        b.style.background = 'var(--bg-input)';
+        b.style.color = 'var(--text-secondary)';
+    });
+    if (gender) {
+        const activeBtn = document.querySelector(`.edit-gender-toggle-btn[data-value="${gender}"]`);
+        if (activeBtn) selectGender(gender, 'edit-student-gender', activeBtn);
+    }
     document.getElementById('edit-student-modal').classList.add('active');
     document.getElementById('edit-student-name').focus();
 }
@@ -907,6 +1183,7 @@ async function submitEditStudent() {
     const full_name   = document.getElementById('edit-student-name').value.trim();
     const registration = document.getElementById('edit-student-reg').value.trim();
     const school_year = document.getElementById('edit-student-year').value;
+    const gender      = document.getElementById('edit-student-gender').value;
     const classroom   = document.getElementById('edit-student-class').value.trim();
     const group_id    = document.getElementById('edit-student-group').value;
     const errEl       = document.getElementById('edit-student-error');
@@ -927,7 +1204,7 @@ async function submitEditStudent() {
         const res  = await fetch(`/cadastros/aluno/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ full_name, registration, school_year, classroom, group_id }),
+            body: JSON.stringify({ full_name, registration, school_year, gender, classroom, group_id }),
         });
         const data = await res.json();
 
@@ -939,7 +1216,10 @@ async function submitEditStudent() {
                 row.dataset.name         = s.full_name.toLowerCase();
                 row.dataset.registration = s.registration.toLowerCase();
                 row.dataset.year         = s.school_year;
-                document.getElementById(`s-name-${id}`).innerHTML  = `<strong>${escHtml(s.full_name)}</strong>`;
+                row.dataset.gender       = s.gender || '';
+                const genderIcon = s.gender === 'M' ? '<span style="color:#5b9bd5;" title="Masculino">♂</span> ' :
+                                   s.gender === 'F' ? '<span style="color:#e57fb3;" title="Feminino">♀</span> ' : '';
+                document.getElementById(`s-name-${id}`).innerHTML  = `<strong>${genderIcon}${escHtml(s.full_name)}</strong>`;
                 document.getElementById(`s-reg-${id}`).textContent  = s.registration;
                 document.getElementById(`s-class-${id}`).textContent = s.classroom || '—';
                 if(document.getElementById(`s-group-${id}`)) document.getElementById(`s-group-${id}`).textContent = s.group_name || '—';
@@ -947,7 +1227,7 @@ async function submitEditStudent() {
                     `<span class="badge badge-accent">${escHtml(s.school_year)}</span>`;
                 // Re-wire edit button
                 row.querySelector('.btn-ghost').setAttribute('onclick',
-                    `openEditStudent(${s.id}, '${s.full_name.replace(/'/g,"\\'")}', '${s.registration}', '${s.school_year}', '${s.classroom}', '${s.group_id || ''}')`);
+                    `openEditStudent(${s.id}, '${s.full_name.replace(/'/g,"\\'")}', '${s.registration}', '${s.school_year}', '${s.gender || ''}', '${s.classroom}', '${s.group_id || ''}')`);
             }
             closeModal('edit-student-modal');
             showToast(`"${s.full_name}" atualizado com sucesso.`, 'success');
@@ -965,7 +1245,7 @@ async function submitEditStudent() {
 }
 
 // ── Edit Event ───────────────────────────────────────────────────────
-function openEditEvent(id, name, group, numSeries, lanes, groupId) {
+function openEditEvent(id, name, group, numSeries, lanes, groupId, gender, isRelay, relaySize) {
     document.getElementById('edit-event-id').value      = id;
     document.getElementById('edit-event-name').value    = name;
     const currentGroups = group ? group.split(',').map(g => g.trim()) : [];
@@ -979,9 +1259,34 @@ function openEditEvent(id, name, group, numSeries, lanes, groupId) {
     document.getElementById('edit-event-error').style.display  = 'none';
     document.getElementById('edit-series-auto-badge').style.display = 'none';
     document.getElementById('edit-series-hint').textContent = '';
+
+    // Set gender
+    document.getElementById('edit-event-gender').value = gender || '';
+    document.querySelectorAll('.edit-event-gender-btn').forEach(b => {
+        b.style.border = '2px solid var(--border)';
+        b.style.background = 'var(--bg-input)';
+        b.style.color = 'var(--text-secondary)';
+    });
+    if (gender) {
+        const gBtn = document.querySelector(`.edit-event-gender-btn[data-value="${gender}"]`);
+        if (gBtn) { gBtn.style.border = '2px solid var(--accent)'; gBtn.style.background = 'rgba(0,201,177,.12)'; gBtn.style.color = 'var(--accent)'; }
+    }
+
+    // Set relay
+    const relayVal = isRelay ? '1' : '0';
+    document.getElementById('edit-event-is-relay').value = relayVal;
+    document.querySelectorAll('.edit-relay-toggle-btn').forEach(b => {
+        const isActive = b.dataset.value === relayVal;
+        b.style.border = isActive ? '2px solid var(--accent)' : '2px solid var(--border)';
+        b.style.background = isActive ? 'rgba(0,201,177,.12)' : 'var(--bg-input)';
+        b.style.color = isActive ? 'var(--accent)' : 'var(--text-secondary)';
+        if (isActive) b.classList.add('active-toggle'); else b.classList.remove('active-toggle');
+    });
+    document.getElementById('edit-relay-size-group').style.display = isRelay ? 'block' : 'none';
+    document.getElementById('edit-relay-size').value = relaySize || 4;
+
     document.getElementById('edit-event-modal').classList.add('active');
     document.getElementById('edit-event-name').focus();
-    // Show hint for current selection
     autoCalcEditEvent();
 }
 
@@ -989,6 +1294,9 @@ async function submitEditEvent() {
     const id                 = document.getElementById('edit-event-id').value;
     const name               = document.getElementById('edit-event-name').value.trim();
     const competition_group  = Array.from(document.querySelectorAll('.edit-group-cb:checked')).map(cb => cb.value).join(',');
+    const gender             = document.getElementById('edit-event-gender').value;
+    const is_relay           = document.getElementById('edit-event-is-relay').value === '1';
+    const relay_size         = parseInt(document.getElementById('edit-relay-size').value) || 4;
     const group_id           = document.getElementById('edit-event-group').value;
     const num_series         = parseInt(document.getElementById('edit-event-series').value) || 1;
     const athletes_per_series = parseInt(document.getElementById('edit-event-lanes').value) || 8;
@@ -1010,7 +1318,7 @@ async function submitEditEvent() {
         const res  = await fetch(`/cadastros/prova/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, competition_group, num_series, athletes_per_series, group_id }),
+            body: JSON.stringify({ name, competition_group, gender, is_relay, relay_size, num_series, athletes_per_series, group_id }),
         });
         const data = await res.json();
 
@@ -1019,18 +1327,24 @@ async function submitEditEvent() {
             const row = document.getElementById(`event-row-${id}`);
             if (row) {
                 row.dataset.group = e.competition_group;
-                document.getElementById(`e-name-${id}`).innerHTML  = `<strong>${escHtml(e.name)}</strong>`;
+                const relayBadge = e.is_relay ? ' <span class="badge" style="font-size:10px; background:rgba(255,165,0,.15); color:#ffa500; margin-left:4px;">🔄 Revez.</span>' : '';
+                document.getElementById(`e-name-${id}`).innerHTML  = `<strong>${escHtml(e.name)}</strong>${relayBadge}`;
+                const genderHtml = e.gender === 'M' ? '<span style="color:#5b9bd5; font-weight:600;">♂ Masc</span>' :
+                                   e.gender === 'F' ? '<span style="color:#e57fb3; font-weight:600;">♀ Fem</span>' :
+                                   e.gender === 'MISTO' ? '<span style="color:var(--accent); font-weight:600;">🔀 Misto</span>' :
+                                   '<span style="color:var(--text-muted);">—</span>';
+                document.getElementById(`e-gender-${id}`).innerHTML = genderHtml;
                 const groupBadges = e.competition_group
                     ? e.competition_group.split(',').map(g => `<span class="badge badge-accent" style="font-size:11px; margin:1px 2px;">${escHtml(g.trim())}</span>`).join('')
                     : '<span style="color:var(--text-muted);">—</span>';
                 document.getElementById(`e-group-${id}`).innerHTML = groupBadges;
-                if(document.getElementById(`e-restricted-group-${id}`)) document.getElementById(`e-restricted-group-${id}`).innerHTML = 
+                if(document.getElementById(`e-restricted-group-${id}`)) document.getElementById(`e-restricted-group-${id}`).innerHTML =
                     `<span style="font-size:12px; color:var(--text-muted);">${e.group_name || 'Aberto'}</span>`;
                 document.getElementById(`e-series-${id}`).textContent = `${e.num_series}×`;
                 document.getElementById(`e-lanes-${id}`).textContent  = e.athletes_per_series;
                 // Re-wire edit button
                 row.querySelector('.btn-ghost').setAttribute('onclick',
-                    `openEditEvent(${e.id}, '${e.name.replace(/'/g,"\\'")}', '${e.competition_group}', ${e.num_series}, ${e.athletes_per_series}, '${e.group_id || ''}')`);
+                    `openEditEvent(${e.id}, '${e.name.replace(/'/g,"\\'")}', '${e.competition_group}', ${e.num_series}, ${e.athletes_per_series}, '${e.group_id || ''}', '${e.gender || ''}', ${e.is_relay}, ${e.relay_size || 4})`);
             }
             closeModal('edit-event-modal');
             showToast(`Prova "${e.name}" atualizada com sucesso.`, 'success');

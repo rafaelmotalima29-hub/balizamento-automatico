@@ -25,7 +25,8 @@ resultados_bp = Blueprint("resultados", __name__)
 def resultados():
     has_results = Result.query.count() > 0
     if not has_results:
-        return render_template("resultados.html", groups=[], has_results=False)
+        return render_template("resultados.html", groups=[], has_results=False,
+                               per_event=[], placar_geral=[], placar_events=[])
 
     # Load all results with students/events
     results = (
@@ -34,6 +35,15 @@ def resultados():
         .join(Student)
         .join(Event)
         .order_by(Result.total_time.asc())
+        .all()
+    )
+
+    # Also load DQ results for per-event view
+    all_results = (
+        Result.query
+        .join(Student)
+        .join(Event)
+        .order_by(Result.total_time.asc().nullslast())
         .all()
     )
 
@@ -118,10 +128,61 @@ def resultados():
             "years": sorted(year_rankings.keys()),
         })
 
+    # ── Per-event classification ──────────────────────────────────────
+    by_event: dict[int, list] = defaultdict(list)
+    for r in all_results:
+        by_event[r.event_id].append(r)
+
+    events_all = Event.query.order_by(Event.name).all()
+    per_event = []
+    for ev in events_all:
+        ev_results = by_event.get(ev.id, [])
+        if not ev_results:
+            continue
+        # Sort: non-DQ by placement, then DQ at the end
+        valid = sorted([r for r in ev_results if not r.is_dq and r.total_time],
+                       key=lambda r: r.total_time)
+        dq = [r for r in ev_results if r.is_dq]
+        ranked = valid + dq
+        per_event.append({
+            "event": ev,
+            "results": ranked,
+            "total": len(ranked),
+            "is_relay": ev.is_relay,
+        })
+
+    # ── Placar Geral (cumulative scoring) ─────────────────────────────
+    # rows = school years, columns = events, cells = sum of points
+    all_years = sorted(set(r.student.school_year for r in all_results))
+    placar_events = [ev for ev in events_all if ev.id in by_event]
+
+    # {school_year: {event_id: total_points}}
+    placar_matrix = defaultdict(lambda: defaultdict(int))
+    placar_totals = defaultdict(int)
+    for r in all_results:
+        if not r.is_dq:
+            yr = r.student.school_year
+            placar_matrix[yr][r.event_id] += r.points
+            placar_totals[yr] += r.points
+
+    placar_geral = []
+    for yr in all_years:
+        row = {
+            "year": yr,
+            "events": {ev.id: placar_matrix[yr][ev.id] for ev in placar_events},
+            "total": placar_totals[yr],
+        }
+        placar_geral.append(row)
+    # Sort by total points descending
+    placar_geral.sort(key=lambda x: x["total"], reverse=True)
+
     return render_template(
         "resultados.html",
         groups=groups_data,
         has_results=True,
+        per_event=per_event,
+        placar_geral=placar_geral,
+        placar_events=placar_events,
     )
 
 
