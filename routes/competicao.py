@@ -135,3 +135,49 @@ def toggle_registration():
         db.session.add(reg)
         db.session.commit()
         return jsonify({"ok": True, "action": "added", "event_count": current_count + 1})
+
+
+# ── Substitute student (AJAX) ────────────────────────────────────────
+
+@competicao_bp.route("/competicao/substitute", methods=["POST"])
+@login_required
+def substitute_student():
+    data = request.get_json(force=True) or {}
+    from_id  = data.get("from_student_id")
+    to_id    = data.get("to_student_id")
+    event_id = data.get("event_id")
+
+    if not all([from_id, to_id, event_id]):
+        return jsonify({"error": "Dados incompletos."}), 400
+
+    old_reg = EventRegistration.query.filter_by(
+        student_id=from_id, event_id=event_id
+    ).first()
+    if not old_reg:
+        return jsonify({"error": "Inscrição original não encontrada."}), 404
+
+    if EventRegistration.query.filter_by(student_id=to_id, event_id=event_id).first():
+        return jsonify({"error": "Novo aluno já está inscrito nesta prova."}), 400
+
+    to_count = EventRegistration.query.filter_by(student_id=to_id).count()
+    if to_count >= MAX_EVENTS_PER_STUDENT:
+        return jsonify({
+            "error": f"Novo aluno já está em {MAX_EVENTS_PER_STUDENT} provas (máximo)."
+        }), 400
+
+    to_student = Student.query.get(to_id)
+    if not to_student:
+        return jsonify({"error": "Novo aluno não encontrado."}), 404
+
+    db.session.delete(old_reg)
+    new_reg = EventRegistration(student_id=to_id, event_id=event_id)
+    db.session.add(new_reg)
+    db.session.commit()
+
+    return jsonify({
+        "ok": True,
+        "to_student_id":   to_id,
+        "to_student_name": to_student.full_name,
+        "to_event_count":  to_count + 1,
+        "from_event_count": EventRegistration.query.filter_by(student_id=from_id).count(),
+    })

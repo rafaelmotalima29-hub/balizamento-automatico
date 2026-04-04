@@ -37,6 +37,15 @@ ODD_ROW_BG     = "1A2030"
 EVEN_ROW_BG    = "141824"
 SERIE_SEP_BG   = "0A1018"
 
+# Per-series colour palette: alternates between two tinted pairs so each
+# series block is visually distinct from its neighbours.
+#   index 0 → series 1, 3, 5 …  (blue tint)
+#   index 1 → series 2, 4, 6 …  (teal tint)
+SERIES_PALETTES = [
+    ("182038", "10182C"),   # blue-tinted pair
+    ("152830", "0E2020"),   # teal-tinted pair
+]
+
 
 # ── Route: preview page ───────────────────────────────────────────────
 
@@ -207,6 +216,11 @@ def export_xlsx():
                 all_series = build_series(ev, ev_students, event_group=group_name)
 
             for series_idx, series in enumerate(all_series, start=1):
+                # ── Per-series fill palette (alternates blue / teal) ─
+                palette       = SERIES_PALETTES[(series_idx - 1) % len(SERIES_PALETTES)]
+                s_odd_fill    = PatternFill("solid", fgColor=palette[0])
+                s_even_fill   = PatternFill("solid", fgColor=palette[1])
+
                 # ── Serie header row ─────────────────────────────────
                 serie_label = f"  Série {series_idx} de {len(all_series)}"
                 serie_cell  = ws.cell(row=current_row, column=1, value=serie_label)
@@ -215,7 +229,7 @@ def export_xlsx():
                 serie_cell.alignment = left_align
                 ws.merge_cells(start_row=current_row, start_column=1,
                                end_row=current_row, end_column=len(HEADER))
-                ws.row_dimensions[current_row].height = 16
+                ws.row_dimensions[current_row].height = 18
                 current_row += 1
 
                 if ev.is_relay:
@@ -237,7 +251,7 @@ def export_xlsx():
                         members = team["students"] if team else []
                         for m_idx in range(relay_size):
                             student = members[m_idx] if m_idx < len(members) else None
-                            row_fill = odd_fill if (current_row % 2 == 0) else even_fill
+                            row_fill = s_odd_fill if (current_row % 2 == 0) else s_even_fill
                             row_data = [
                                 series_idx,
                                 lane_idx,
@@ -245,12 +259,8 @@ def export_xlsx():
                                 student.registration if student else "",
                                 student.school_year  if student else "",
                                 student.classroom or "" if student else "",
+                                "", "", "",  # Minutos, Segundos, Centésimos
                             ]
-                            # Time columns only on last member row (team time)
-                            if m_idx == relay_size - 1:
-                                row_data += ["", "", ""]  # Minutos, Segundos, Centésimos
-                            else:
-                                row_data += ["", "", ""]
                             use_thick = m_idx == 0
                             for col_idx, value in enumerate(row_data, start=1):
                                 cell = ws.cell(row=current_row, column=col_idx, value=value)
@@ -263,7 +273,7 @@ def export_xlsx():
                 else:
                     # ── Individual: one student per lane ─────────────
                     for lane_idx, student in enumerate(series, start=1):
-                        row_fill = odd_fill if (current_row % 2 == 0) else even_fill
+                        row_fill = s_odd_fill if (current_row % 2 == 0) else s_even_fill
                         row_data = [
                             series_idx,
                             lane_idx,
@@ -290,7 +300,7 @@ def export_xlsx():
                     for col_idx in range(1, len(HEADER) + 1):
                         sep_cell      = ws.cell(row=current_row, column=col_idx)
                         sep_cell.fill = sep_fill
-                    ws.row_dimensions[current_row].height = 5
+                    ws.row_dimensions[current_row].height = 6
                     current_row += 1
 
             # ── Blank spacer between events ──────────────────────────

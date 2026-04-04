@@ -193,6 +193,7 @@
                     <th>Sexo</th>
                     <th>Sala</th>
                     <th style="text-align:center;" title="Provas inscritas">Provas</th>
+                    <th style="width:40px;"></th>
                 </tr>
             </thead>
             <tbody>
@@ -204,6 +205,7 @@
                     data-name="{{ s.full_name | lower }}"
                     data-reg="{{ s.registration | lower }}"
                     data-assigned="{{ '1' if is_assigned else '0' }}"
+                    data-fullname="{{ s.full_name }}"
                     style="{% if at_max %}opacity:0.5;{% endif %}">
                     <td style="text-align:center;">
                         <label class="toggle-check" style="cursor:pointer;">
@@ -235,6 +237,15 @@
                             {{ evt_count }}/{{ max_events }}
                         </span>
                     </td>
+                    <td style="text-align:center;">
+                        {% if is_assigned %}
+                        <button class="btn btn-ghost btn-sm"
+                                onclick="openSubstituteModal({{ s.id }}, '{{ s.full_name | replace("'", "\\'") }}')"
+                                title="Substituir aluno" style="padding:2px 8px; font-size:12px;">
+                            🔄
+                        </button>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -247,6 +258,51 @@
 {% endblock %}
 
 {% block extra_js %}
+
+<!-- ══════════════════════════════════════════
+     MODAL DE SUBSTITUIÇÃO
+══════════════════════════════════════════ -->
+{% if selected_event %}
+<div id="sub-modal-overlay" style="
+    display:none; position:fixed; inset:0; z-index:1000;
+    background:rgba(0,0,0,.65); align-items:center; justify-content:center;">
+    <div style="
+        background:var(--bg-card); border:1px solid var(--border);
+        border-radius:14px; padding:28px 24px; width:100%; max-width:440px;
+        box-shadow:0 8px 32px rgba(0,0,0,.5); margin:16px;">
+        <div style="font-size:17px; font-weight:700; margin-bottom:6px;">🔄 Substituir Aluno</div>
+        <div style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">
+            Substituindo: <strong id="sub-from-name" style="color:var(--text-primary);"></strong>
+        </div>
+
+        <div class="form-group" style="margin-bottom:16px;">
+            <label>Buscar substituto</label>
+            <input type="text" id="sub-search" placeholder="Nome ou matrícula..."
+                   oninput="filterSubList()" style="margin-bottom:8px;" />
+        </div>
+
+        <div id="sub-list" style="
+            max-height:220px; overflow-y:auto; border:1px solid var(--border);
+            border-radius:8px; margin-bottom:20px; background:var(--bg-base);">
+            <!-- populated by JS -->
+        </div>
+
+        <div id="sub-selected-info" style="
+            display:none; background:rgba(0,201,177,.08); border:1px solid rgba(0,201,177,.25);
+            border-radius:8px; padding:10px 14px; margin-bottom:16px; font-size:13px;">
+            Selecionado: <strong id="sub-selected-name" style="color:var(--accent);"></strong>
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+            <button class="btn btn-ghost" onclick="closeSubstituteModal()">Cancelar</button>
+            <button class="btn btn-primary" id="sub-confirm-btn" disabled onclick="confirmSubstitution()">
+                Confirmar Substituição
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <script>
 const MAX_EVENTS = {{ max_events }};
 const EVENT_ID = {{ selected_event_id or 'null' }};
@@ -364,6 +420,174 @@ function showToast(msg, type) {
     toast.textContent = msg;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
+}
+
+// ── Substitution modal ───────────────────────────────────────────────
+
+let _subFromId   = null;
+let _subToId     = null;
+
+function openSubstituteModal(fromStudentId, fromName) {
+    _subFromId = fromStudentId;
+    _subToId   = null;
+
+    document.getElementById('sub-from-name').textContent = fromName;
+    document.getElementById('sub-search').value = '';
+    document.getElementById('sub-selected-info').style.display = 'none';
+    document.getElementById('sub-confirm-btn').disabled = true;
+
+    // Build list of unassigned eligible students from the DOM
+    _buildSubList('');
+
+    const overlay = document.getElementById('sub-modal-overlay');
+    if (overlay) { overlay.style.display = 'flex'; }
+    setTimeout(() => document.getElementById('sub-search').focus(), 80);
+}
+
+function closeSubstituteModal() {
+    const overlay = document.getElementById('sub-modal-overlay');
+    if (overlay) overlay.style.display = 'none';
+    _subFromId = null;
+    _subToId   = null;
+}
+
+function _buildSubList(query) {
+    const list = document.getElementById('sub-list');
+    list.innerHTML = '';
+    const rows = document.querySelectorAll('#students-table tbody tr');
+    let found = 0;
+
+    rows.forEach(row => {
+        const sid = parseInt(row.id.replace('row-', ''));
+        if (sid === _subFromId) return;                        // skip self
+        if (row.dataset.assigned === '1') return;              // skip already assigned
+        const name = row.dataset.fullname || row.dataset.name;
+        const reg  = row.dataset.reg || '';
+        if (query && !name.toLowerCase().includes(query) && !reg.includes(query)) return;
+
+        const item = document.createElement('div');
+        item.style.cssText = 'padding:10px 14px; cursor:pointer; border-bottom:1px solid var(--border); font-size:13px; display:flex; gap:8px; align-items:center;';
+        item.dataset.sid  = sid;
+        item.dataset.name = name;
+
+        // Get badge text from within the row
+        const badge = row.querySelector('.badge.badge-accent');
+        const year  = badge ? badge.textContent.trim() : '';
+
+        item.innerHTML = `<div style="flex:1;"><strong>${name}</strong>${year ? ` <span style="color:var(--text-muted);font-size:11px;">· ${year}</span>` : ''}</div>`;
+        item.onclick = () => _selectSubstitute(sid, name, item);
+        list.appendChild(item);
+        found++;
+    });
+
+    if (found === 0) {
+        list.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted); font-size:13px;">Nenhum aluno disponível.</div>';
+    }
+}
+
+function filterSubList() {
+    const q = document.getElementById('sub-search').value.toLowerCase().trim();
+    _buildSubList(q);
+}
+
+function _selectSubstitute(sid, name, itemEl) {
+    _subToId = sid;
+    // Highlight selected item
+    document.querySelectorAll('#sub-list div[data-sid]').forEach(el => {
+        el.style.background = '';
+    });
+    itemEl.style.background = 'rgba(0,201,177,.1)';
+
+    document.getElementById('sub-selected-name').textContent = name;
+    document.getElementById('sub-selected-info').style.display = 'block';
+    document.getElementById('sub-confirm-btn').disabled = false;
+}
+
+async function confirmSubstitution() {
+    if (!_subFromId || !_subToId || !EVENT_ID) return;
+
+    const btn = document.getElementById('sub-confirm-btn');
+    btn.disabled = true;
+    btn.textContent = 'Aguarde...';
+
+    try {
+        const resp = await fetch('{{ url_for("competicao.substitute_student") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                from_student_id: _subFromId,
+                to_student_id:   _subToId,
+                event_id:        EVENT_ID,
+            }),
+        });
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            showToast(data.error || 'Erro na substituição.', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Confirmar Substituição';
+            return;
+        }
+
+        // ── Update DOM: old student → unassigned ─────────────────────
+        const fromRow = document.getElementById(`row-${_subFromId}`);
+        if (fromRow) {
+            fromRow.dataset.assigned = '0';
+            const cb = document.getElementById(`cb-${_subFromId}`);
+            if (cb) cb.checked = false;
+            // Remove substitute button
+            const subBtn = fromRow.querySelector('button');
+            if (subBtn) subBtn.remove();
+            // Update event count badge
+            const countEl = document.getElementById(`count-${_subFromId}`);
+            if (countEl) {
+                countEl.textContent = `${data.from_event_count}/${MAX_EVENTS}`;
+                if (data.from_event_count < MAX_EVENTS) {
+                    countEl.style.background = '';
+                    countEl.style.color = '';
+                }
+            }
+        }
+
+        // ── Update DOM: new student → assigned ───────────────────────
+        const toRow = document.getElementById(`row-${_subToId}`);
+        if (toRow) {
+            toRow.dataset.assigned = '1';
+            const cb = document.getElementById(`cb-${_subToId}`);
+            if (cb) cb.checked = true;
+            // Add substitute button
+            const actionTd = toRow.querySelectorAll('td');
+            const lastTd = actionTd[actionTd.length - 1];
+            if (lastTd && !lastTd.querySelector('button')) {
+                const newBtn = document.createElement('button');
+                newBtn.className = 'btn btn-ghost btn-sm';
+                newBtn.title = 'Substituir aluno';
+                newBtn.style.cssText = 'padding:2px 8px; font-size:12px;';
+                newBtn.textContent = '🔄';
+                const toName = toRow.dataset.fullname || data.to_student_name;
+                newBtn.onclick = () => openSubstituteModal(_subToId, toName);
+                lastTd.appendChild(newBtn);
+            }
+            // Update event count badge
+            const countEl = document.getElementById(`count-${_subToId}`);
+            if (countEl) {
+                countEl.textContent = `${data.to_event_count}/${MAX_EVENTS}`;
+                if (data.to_event_count >= MAX_EVENTS) {
+                    countEl.style.background = 'rgba(239,68,68,.15)';
+                    countEl.style.color = '#ef4444';
+                }
+            }
+        }
+
+        updateMetrics();
+        closeSubstituteModal();
+        showToast(`Substituído por ${data.to_student_name}!`, 'success');
+
+    } catch (err) {
+        showToast('Erro de conexão.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Confirmar Substituição';
+    }
 }
 </script>
 {% endblock %}
